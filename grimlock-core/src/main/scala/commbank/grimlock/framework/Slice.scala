@@ -54,7 +54,9 @@ case class Over[
 /** Companion object to `Over` case class. */
 object Over {
   /**
-   * Construct an `Over` for 1 dimension.
+   * Construct an `Over` for 1 dimension. Implicit parameter order is different from the case class constructor to
+   * avoid duplicate symbols compiler error. Without the re-ordering, the erasure of type parameters at run time makes
+   * the apply method indistinguishable from the case class constructor.
    *
    * @param dimension Dimension of the selected coordinate.
    */
@@ -66,8 +68,8 @@ object Over {
   ](
     dimension: D
   )(implicit
-    ev1: Position.IndexConstraints.Aux[P, D :: HNil, V :: HNil],
-    ev2: Position.RemoveConstraints.Aux[P, D :: HNil, R]
+    ev1: Position.RemoveConstraints.Aux[P, D, R],
+    ev2: Position.IndexConstraints.Aux[P, D, V]
   ): Over[P, D :: HNil, V :: HNil, R] = Over(dimension :: HNil)
 
   /**
@@ -140,7 +142,9 @@ case class Along[
 /** Companion object to `Along` case class. */
 object Along {
   /**
-   * Construct an `Along` for 1 dimension.
+   * Construct an `Along` for 1 dimension. Implicit parameter order is different from the case class constructor to
+   * avoid duplicate symbols compiler error. Without the re-ordering, the erasure of type parameters at run time makes
+   * the apply method indistinguishable from the case class constructor.
    *
    * @param dimension Dimension of the coordinate to exclude.
    */
@@ -152,8 +156,8 @@ object Along {
   ](
     dimension: D
   )(implicit
-    ev1: Position.IndexConstraints.Aux[P, D :: HNil, V :: HNil],
-    ev2: Position.RemoveConstraints.Aux[P, D :: HNil, S]
+    ev1: Position.RemoveConstraints.Aux[P, D, S],
+    ev2: Position.IndexConstraints.Aux[P, D, V]
   ): Along[P, D :: HNil, V :: HNil, S] = Along(dimension :: HNil)
 
   /**
