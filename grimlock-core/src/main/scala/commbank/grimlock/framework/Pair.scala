@@ -148,61 +148,64 @@ object PairSchema {
 * filled to have `PairValue`s. This operation is conceptually similar to an inner join, with the
 * difference being that if duplicates are found all rows for that entry are discarded.
 *
-* Note: There is only support for turning `left` and `right` into the same type.
-*
-* @param left         String indicating the key for the left data
-* @param right        String indicating the key for the right data
-* @param codec        A Codec of type X for which the data should attempt to be cast.
+* @param left         A `PairSpec` detailing the settings desired for the left data.
+* @param right        A `PairSpec` detailing the settings desired for the right data.
 * @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
-* @param leftDefault  The default value, as an option for the left data.
-* @param rightDefault The default value, as an option for the right data.
 * */
 case class GeneratePair[
   P <: HList,
   S <: HList,
   D <: Nat,
-  X : ClassTag : TypeTag
+  X : ClassTag : TypeTag,
+  Y : ClassTag : TypeTag
 ](
-  left: String,
-  right: String,
-  codec: Codec[X],
-  dim: D,
-  leftDefault: Option[X] = None,
-  rightDefault: Option[X] = None
+  left: PairSpec[X],
+  right: PairSpec[Y],
+  dim: D
 )(implicit
   ev1: Position.IndexConstraints.Aux[P, D, Value[String]]
 ) extends Agg[P, S, S] {
-  type T = List[(String, X)]
+  type T = List[(String, Either[X, Y])]
   type O[A] = Single[A]
 
   val tTag = classTag[T]
   val oTag = classTag[O[_]]
 
-  def prepare(cell: Cell[P]): Option[T] = cell.content.value.as[X].map(d => List((cell.position(dim).value, d)))
+  def prepare(cell: Cell[P]): Option[T] = cell.position(dim).value match {
+    case str: String if str == left.id => cell.content.value.as[X].map(d => List((str, Left(d))))
+    case str: String if str == right.id => cell.content.value.as[Y].map(d => List((str, Right(d))))
+    case _ => None
+  }
 
   def reduce(lt: T, rt: T): T = lt ++ rt
 
   def present(pos: Position[S], t: T): O[Cell[S]] = t match {
-    case List(first, second) =>
-      val l = if (first._1 == left) first._2 else second._2
-      val r = if (first._1 == right) first._2 else second._2
-      createSingle(pos, l, r)
-    case List((str, value)) if str == left =>
-      rightDefault.map(createSingle(pos, value, _)).getOrElse(Single())
-    case List((str, value)) if str == right =>
-      leftDefault.map(createSingle(pos, _, value)).getOrElse(Single())
+    case List((str1, Left(x)), (str2, Right(y))) => createSingle(pos, x, y)
+    case List((str1, Right(y)), (str2, Left(x))) => createSingle(pos, x, y)
+    case List((str, Left(x))) =>
+      right.default.map(createSingle(pos, x, _)).getOrElse(Single())
+    case List((str, Right(y))) =>
+      left.default.map(createSingle(pos, _, y)).getOrElse(Single())
     case _ => Single()
   }
 
-  private def createSingle(position: Position[S], left: X, right: X): O[Cell[S]] = {
+  private def createSingle(position: Position[S], l: X, r: Y): O[Cell[S]] = {
     Single(
       Cell(
         position,
         Content(
-          PairSchema[X, X](),
-          PairValue((left, right), PairCodec(codec, codec))
+          PairSchema[X, Y](),
+          PairValue((l, r), PairCodec(left.codec, right.codec))
         )
       )
     )
   }
 }
+
+/** Configuration class for one side of the `GeneratePair` aggregator.
+  *
+  * @param id      String indicating the key that identifies this Spec.
+  * @param codec   A codec of type X for which the data should attempt to be cast.
+  * @param default Optionally, a default value for the data.
+  */
+case class PairSpec[X](id: String, codec: Codec[X], default: Option[X] = None)

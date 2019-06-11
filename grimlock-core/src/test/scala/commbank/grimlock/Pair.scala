@@ -27,7 +27,7 @@ import commbank.grimlock.framework.encoding.{
   TimestampCodec
 }
 import commbank.grimlock.framework.metadata.Type
-import commbank.grimlock.framework.pair.{ GeneratePair, PairCodec, PairSchema, PairValue }
+import commbank.grimlock.framework.pair.{ GeneratePair, PairCodec, PairSchema, PairSpec, PairValue }
 import commbank.grimlock.framework.position.Position
 
 import java.sql.Timestamp
@@ -292,19 +292,23 @@ class TestGeneratePair extends TestAggregators {
 
   val cellD1 = Cell(Position("left", "foo"), getDoubleContent(1))
   val cellD2 = Cell(Position("right", "foo"), getDoubleContent(2))
-  val tD1 = List(("left", 1))
-  val tD2 = List(("right", 2))
+  val tD1 = List(("left", Left(1)))
+  val tD2 = List(("right", Right(2)))
 
   val cellS1 = Cell(Position("left", "bar"), getStringContent("foo"))
   val cellS2 = Cell(Position("right", "bar"), getStringContent("baz"))
-  val tS1 = List(("left", "foo"))
-  val tS2 = List(("right", "baz"))
+  val tS1 = List(("left", Left("foo")))
+  val tS2 = List(("right", Right("baz")))
 
   val stringDefault = "string.default"
   val doubleDefault: Double = -999.0
 
   "A GeneratePair" should "prepare, reduce and present Doubles" in {
-    val obj = GeneratePair[P, S, _0, Double]("left", "right", DoubleCodec, _0)
+    val obj = GeneratePair[P, S, _0, Double, Double](
+      PairSpec("left", DoubleCodec),
+      PairSpec("right", DoubleCodec),
+      _0
+    )
 
     val t1 = obj.prepare(cellD1)
     t1 shouldBe Option(tD1)
@@ -320,7 +324,11 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "prepare, reduce and present Strings" in {
-    val obj = GeneratePair[P, S, _0, String]("left", "right", StringCodec, _0)
+    val obj = GeneratePair[P, S, _0, String, String](
+      PairSpec("left", StringCodec),
+      PairSpec("right", StringCodec),
+      _0
+    )
 
     val t1 = obj.prepare(cellS1)
     t1 shouldBe Option(tS1)
@@ -336,8 +344,11 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "prepare, reduce and present expanded" in {
-    val obj = GeneratePair[P, S, _0, Double]("left", "right", DoubleCodec, _0)
-      .andThenRelocate(_.position.append("pair").toOption)
+    val obj = GeneratePair[P, S, _0, Double, Double](
+      PairSpec("left", DoubleCodec),
+      PairSpec("right", DoubleCodec),
+      _0
+    ).andThenRelocate(_.position.append("pair").toOption)
 
     val t1 = obj.prepare(cellD1)
     val t2 = obj.prepare(cellD2)
@@ -347,29 +358,45 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present with default values for left" in {
-    val obj = GeneratePair[P, S, _0, String]("left", "right", StringCodec, _0, Option(stringDefault), None)
+    val obj = GeneratePair[P, S, _0, String, String](
+      PairSpec("left", StringCodec, Option(stringDefault)),
+      PairSpec("right", StringCodec),
+      _0
+    )
     val t = obj.prepare(cellS2)
     val c = obj.present(Position("foo"), t.get).result
     c shouldBe Option(Cell(Position("foo"), getPairContent(stringDefault, "baz", PairCodec(StringCodec, StringCodec))))
   }
 
   it should "present with default values for right" in {
-    val obj = GeneratePair[P, S, _0, Double]("left", "right", DoubleCodec, _0, None, Option(doubleDefault))
+    val obj = GeneratePair[P, S, _0, Double, Double](
+      PairSpec("left", DoubleCodec),
+      PairSpec("right", DoubleCodec, Option(doubleDefault)),
+      _0
+    )
     val t = obj.prepare(cellD1)
     val c = obj.present(Position("foo"), t.get).result
     c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, doubleDefault, PairCodec(DoubleCodec, DoubleCodec))))
   }
 
   it should "present empty with no default values" in {
-    val obj = GeneratePair[P, S, _0, Double]("left", "right", DoubleCodec, _0)
-    val t = List.empty[(String, Double)]
+    val obj = GeneratePair[P, S, _0, Double, Double](
+      PairSpec("left", DoubleCodec),
+      PairSpec("right", DoubleCodec),
+      _0
+    )
+    val t = List.empty[(String, Either[Double, Double])]
     val c = obj.present(Position("foo"), t).result
       c shouldBe None
   }
 
   it should "present empty with both default values and no input" in {
-    val obj = GeneratePair[P, S, _0, Double]("left", "right", DoubleCodec, _0, Option(doubleDefault), Option(doubleDefault))
-    val t = List.empty[(String, Double)]
+    val obj = GeneratePair[P, S, _0, Double, Double](
+      PairSpec("left", DoubleCodec, Option(doubleDefault)),
+      PairSpec("right", DoubleCodec, Option(doubleDefault)),
+      _0
+    )
+    val t = List.empty[(String, Either[Double, Double])]
     val c = obj.present(Position("foo"), t).result
       c shouldBe None
   }
