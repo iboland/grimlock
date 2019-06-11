@@ -34,6 +34,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.immutable.StringOps
+import scala.reflect.runtime.universe.{ typeTag, TypeTag }
 
 import shapeless.{ HList, Nat }
 import shapeless.nat.{ _0, _1 }
@@ -74,6 +75,7 @@ case object ExampleEventSchema extends Schema[ExampleEvent] {
 
 // Define a value that wraps the event.
 case class ExampleEventValue(value: ExampleEvent) extends Value[ExampleEvent] {
+  val ttag: TypeTag[ExampleEvent] = typeTag[ExampleEvent]
   val codec = ExampleEventCodec
 
   def cmp[V <% Value[_]](that: V): Option[Int] = that.as[ExampleEvent].map(e => cmp(e))
