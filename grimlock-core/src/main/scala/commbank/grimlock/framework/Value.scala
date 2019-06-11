@@ -39,9 +39,19 @@ trait Value[T] {
   /** Return value as `X` (if an appropriate converter exists), or `None` if the conversion is not supported. */
   def as[X : ClassTag: TypeTag]: Option[X] = {
     val ct = implicitly[ClassTag[X]]
+    /** ClassTag's are unable to check parameters within classes. So for a set of ClassTags we wish to
+      * match on exact typeTags. For these sets all converters will result in None, because we test based
+      * on ttag: TypeTag[T]. */
+    val typeTagSet: Set[ClassTag[_]] = Set(classTag[Tuple1[_]], classTag[Tuple2[_, _]], classTag[List[_]])
 
     def cast(v: Any): Option[X] = v match {
-      case ct(x) if ttag == typeTag[X] => Option(x)
+      case ct(x) if typeTagSet.contains(ct) => castTypeTag(v)
+      case ct(x) => Option(x)
+      case _ => None
+    }
+
+    def castTypeTag(v: Any): Option[X] = v match {
+      case ct(x) if typeTag[X] == ttag => Option(x)
       case _ => None
     }
 
