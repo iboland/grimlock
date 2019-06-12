@@ -26,7 +26,6 @@ import scala.util.matching.Regex
 
 /** Trait for variable values. */
 trait Value[T] {
-
   /** The codec used to encode/decode this value. */
   val codec: Codec[T]
 

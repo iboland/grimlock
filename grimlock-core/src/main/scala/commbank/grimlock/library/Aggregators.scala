@@ -921,15 +921,9 @@ case class GeneratePair[
   }
 
   private def createSingle(position: Position[S], l: X, r: Y): O[Cell[S]] = {
-    Single(
-      Cell(
-        position,
-        Content(
-          PairSchema[X, Y](),
-          PairValue((l, r), PairCodec(left.codec, right.codec))
-        )
-      )
-    )
+    val content = Content(PairSchema[X, Y](), PairValue((l, r), PairCodec(left.codec, right.codec)))
+
+    Single(Cell(position, content))
   }
 }
 
