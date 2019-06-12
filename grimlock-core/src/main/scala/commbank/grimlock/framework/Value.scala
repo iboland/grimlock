@@ -346,6 +346,24 @@ object LongValue {
   def unapply(value: Value[_]): Option[Long] = ClassTag.Long.unapply(value.value)
 }
 
+case class PairValue[
+  X: TypeTag,
+  Y: TypeTag
+](
+   value: (X, Y),
+   codec: PairCodec[X, Y]
+ ) extends Value[(X, Y)] {
+  protected val ttag: TypeTag[(X, Y)] = typeTag[(X, Y)]
+
+  def cmp[V <% Value[_]](that: V): Option[Int] = that.as[(X, Y)].map(t => cmp(t))
+}
+
+/** Companion object to `PairValue` case class. */
+object PairValue {
+  /** `unapply` method for pattern matching. */
+  def unapply[X, Y](value: Value[_]): Option[(X, Y)] = classTag[(X, Y)].unapply(value.value)
+}
+
 /**
  * Value for when the data is of type `String`.
  *

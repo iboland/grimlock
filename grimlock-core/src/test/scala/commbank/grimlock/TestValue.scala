@@ -1033,6 +1033,177 @@ class TestIntValue extends TestGrimlock {
   }
 }
 
+class TestPairValue extends TestGrimlock {
+  import commbank.grimlock.framework.environment.implicits.{ booleanToValue, doubleToValue, intToValue }
+
+  val cdcFoo = PairCodec(DoubleCodec, StringCodec, '{', '*', '}')
+  val cdcBar = PairCodec(StringCodec, DoubleCodec)
+  val foo = (1.0, "abc")
+  val fooBig = (2.0, "abc")
+  val fooBig2 = (1.0, "def")
+  val bar = ("def", 1.001)
+  val dvfoo = PairValue(foo, cdcFoo)
+  val dvfooBig = PairValue(fooBig, cdcFoo)
+  val dvfooBig2 = PairValue(fooBig2, cdcFoo)
+  val dvbar = PairValue(bar, cdcBar)
+
+  "A PairValue" should "return its short string" in {
+    dvfoo.toShortString shouldBe "{1.0*abc}"
+  }
+
+  it should "not return a date" in {
+    dvfoo.as[Date] shouldBe None
+  }
+
+  it should "not return a string" in {
+    dvfoo.as[String] shouldBe None
+    dvfoo.as[String] shouldBe None
+  }
+
+  it should "not return a double" in {
+    dvfoo.as[Double] shouldBe None
+  }
+
+  it should "not return a float" in {
+    dvfoo.as[Float] shouldBe None
+  }
+
+  it should "not return a long" in {
+    dvfoo.as[Long] shouldBe None
+  }
+
+  it should "not return a int" in {
+    dvfoo.as[Int] shouldBe None
+  }
+
+  it should "not return a boolean" in {
+    dvfoo.as[Boolean] shouldBe None
+  }
+
+  it should "not return a type" in {
+    dvfoo.as[Type] shouldBe None
+  }
+
+  it should "not return a timestamp" in {
+    dvfoo.as[Timestamp] shouldBe None
+  }
+
+  it should "not return a byte array" in {
+    dvfoo.as[Array[Byte]] shouldBe None
+  }
+
+  it should "not return a decimal" in {
+    dvfoo.as[BigDecimal] shouldBe None
+  }
+
+  it should "return a pair when given correct types" in {
+    dvfoo.as[(Double, String)] shouldBe Option((1.0, "abc"))
+    dvbar.as[(String, Double)] shouldBe Option(("def", 1.001))
+  }
+
+  it should "not return a pair when given incorrect types" in {
+    dvfoo.as[(Timestamp, Date)] shouldBe None
+    dvbar.as[(BigDecimal, Boolean)] shouldBe None
+  }
+
+  it should "equal itself" in {
+    dvfoo.equ(dvfoo) shouldBe true
+    dvfoo.equ(PairValue(foo, cdcFoo)) shouldBe true
+  }
+
+  it should "not equal another pair" in {
+    StringValue("foo").equ(DoubleValue(1.0))
+    dvfoo.equ(dvbar) shouldBe false
+    dvfoo.equ(dvfooBig) shouldBe false
+  }
+
+  it should "not equal another value" in {
+    dvfoo.equ(2) shouldBe false
+    dvfoo.equ(2.0) shouldBe false
+    dvfoo.equ(false) shouldBe false
+  }
+
+  it should "match a matching pattern" in {
+    dvfoo.like("^\\{...\\*...\\}".r) shouldBe true
+  }
+
+  it should "not match a non-existing pattern" in {
+    dvfoo.like("^_".r) shouldBe false
+  }
+
+  it should "identify a smaller value calling lss" in {
+    dvfoo.lss(dvfooBig) shouldBe true
+    dvfoo.lss(dvfooBig2) shouldBe true
+  }
+
+  it should "not identify an equal value calling lss" in {
+    dvbar.lss(dvbar) shouldBe false
+  }
+
+  it should "not identify a greater value calling lss" in {
+    dvfooBig.lss(dvfoo) shouldBe false
+  }
+
+  it should "not identify another value calling lss" in {
+    dvfooBig.lss(dvfoo) shouldBe false
+    dvfooBig2.lss(dvfoo) shouldBe false
+  }
+
+  it should "identify a smaller value calling leq" in {
+    dvfoo.leq(dvfooBig) shouldBe true
+    dvfoo.leq(dvfooBig2) shouldBe true
+  }
+
+  it should "identify an equal value calling leq" in {
+    dvbar.leq(dvbar) shouldBe true
+  }
+
+  it should "not identify a greater value calling leq" in {
+    dvfooBig.leq(dvfoo) shouldBe false
+    dvfooBig2.leq(dvfoo) shouldBe false
+  }
+
+  it should "not identify another value calling leq" in {
+    dvbar.leq(2) shouldBe false
+  }
+
+  it should "not identify a smaller value calling gtr" in {
+    dvfoo.gtr(dvfooBig) shouldBe false
+    dvfoo.gtr(dvfooBig2) shouldBe false
+  }
+
+  it should "not identify an equal value calling gtr" in {
+    dvbar.gtr(dvbar) shouldBe false
+  }
+
+  it should "identify a greater value calling gtr" in {
+    dvfooBig.gtr(dvfoo) shouldBe true
+    dvfooBig2.gtr(dvfoo) shouldBe true
+  }
+
+  it should "not identify another value calling gtr" in {
+    dvbar.gtr(2) shouldBe false
+  }
+
+  it should "not identify a smaller value calling geq" in {
+    dvfoo.geq(dvfooBig) shouldBe false
+    dvfoo.geq(dvfooBig2) shouldBe false
+  }
+
+  it should "identify an equal value calling geq" in {
+    dvbar.geq(dvbar) shouldBe true
+  }
+
+  it should "identify a greater value calling geq" in {
+    dvfooBig.geq(dvfoo) shouldBe true
+    dvfooBig2.geq(dvfoo) shouldBe true
+  }
+
+  it should "not identify another value calling geq" in {
+    dvbar.geq(2) shouldBe false
+  }
+}
+
 class TestBooleanValue extends TestGrimlock {
   val pos = true
   val neg = false

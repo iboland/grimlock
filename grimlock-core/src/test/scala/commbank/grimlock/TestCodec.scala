@@ -467,3 +467,40 @@ class TestTypeCodec extends TestGrimlock {
   }
 }
 
+class TestPairCodec extends TestGrimlock {
+  val pair1 = (1.0, "abcde")
+  val pair2 = ("foo", 7)
+  val pair3 = ("baz", 15)
+  val pair4 = ("baz", 2)
+
+  "A PairCodec" should "have a name" in {
+    PairCodec(DoubleCodec, StringCodec).toShortString shouldBe "pair,double,string,(,)"
+  }
+
+  it should "decode a correct value" in {
+    PairCodec(DoubleCodec, StringCodec, ')', '#', '(').decode(")1.0#abcde(") shouldBe Option(pair1)
+  }
+
+  it should "encode a correct value" in {
+    PairCodec(StringCodec, IntCodec, '{', '_', '}').encode(pair2) shouldBe "{foo_7}"
+  }
+
+  it should "compare a correct value" in {
+    PairCodec(StringCodec, IntCodec).compare(pair2, pair3) > 0 shouldBe true
+    PairCodec(StringCodec, IntCodec).compare(pair4, pair3) < 0 shouldBe true
+    PairCodec(StringCodec, IntCodec).compare(pair4, pair4) shouldBe 0
+  }
+
+  it should "box correctly" in {
+    PairCodec(DoubleCodec, StringCodec, '*', '*', '*').box(pair1) shouldBe
+      PairValue(pair1, PairCodec(DoubleCodec, StringCodec, '*', '*', '*'))
+  }
+
+  it should "return fields" in {
+    PairCodec(IntCodec, IntCodec).converters.size shouldBe 0
+
+    PairCodec(StringCodec, DoubleCodec).date.isEmpty shouldBe true
+    PairCodec(StringCodec, DoubleCodec).integral.isEmpty shouldBe true
+    PairCodec(StringCodec, DoubleCodec).numeric.isEmpty shouldBe true
+  }
+}

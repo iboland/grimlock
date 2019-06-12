@@ -195,3 +195,10 @@ case object DateType extends Type {
   def toShortString: String = DateType.name
 }
 
+/** Type for pair types. */
+case object PairType extends Type {
+  /** Short name for this type. */
+  val name = "pair"
+
+  def toShortString: String = PairType.name
+}

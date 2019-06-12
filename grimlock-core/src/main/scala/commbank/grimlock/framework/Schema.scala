@@ -14,7 +14,7 @@
 
 package commbank.grimlock.framework.metadata
 
-import commbank.grimlock.framework.encoding.{ Codec, IntCodec, Value }
+import commbank.grimlock.framework.encoding.{ Codec, IntCodec, PairCodec, Value }
 
 import java.util.Date
 
@@ -601,6 +601,31 @@ object OrdinalSchema {
 
   /** Pattern for matching short string ordinal schema with a set of values. */
   private val PatternSet = s"${OrdinalType.name}\\(set=\\{(.*)\\}\\)".r
+}
+
+case class PairSchema[X, Y]() extends Schema[(X, Y)] {
+  val classification = PairType
+
+  def validate(value: Value[(X, Y)]): Boolean = true
+}
+
+object PairSchema {
+  val Pattern = s"${PairType.name}.*".r
+  /**
+    * Parse a pair schema from string.
+    *
+    * @param str   The string to parse.
+    * @param codec The codec to parse with.
+    *
+    * @return A `Some[PairSchema[X, Y]]` if successful, `None` otherwise.
+    */
+  def fromShortString[X, Y](str: String, codec: PairCodec[X, Y]): Option[PairSchema[X, Y]] = str match {
+    case PatternName() => Option(PairSchema[X, Y]())
+    case _ => None
+  }
+
+  /** Pattern for matching short string nominal schema. */
+  private val PatternName = PairType.name.r
 }
 
 /**

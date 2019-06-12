@@ -17,6 +17,7 @@ package commbank.grimlock.test
 import commbank.grimlock.framework.encoding._
 import commbank.grimlock.framework.metadata._
 
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -478,3 +479,31 @@ class TestDateSchema extends TestGrimlock {
   }
 }
 
+class TestPairSchema extends TestGrimlock {
+  val dfmt = new java.text.SimpleDateFormat("dd/MM/yyyy")
+  val date2001 = dfmt.parse("01/01/2001")
+  val one = BigDecimal(1.0)
+
+  "A PairSchema" should "return its string representation" in {
+    PairSchema[String, Double]().toShortString(PairCodec(StringCodec, DoubleCodec)) shouldBe "pair"
+    PairSchema[Date, Timestamp]().toShortString(PairCodec(DateCodec(), TimestampCodec)) shouldBe "pair"
+  }
+
+  it should "validate a correct value" in {
+    PairSchema[String, Double]().validate(PairValue(("abc", 1.0), PairCodec(StringCodec, DoubleCodec))) shouldBe true
+    PairSchema[Timestamp, BigDecimal]()
+      .validate(PairValue((new Timestamp(date2001.getTime), one), PairCodec(TimestampCodec, DecimalCodec(5, 4)))) shouldBe true
+  }
+
+  it should "not validate an incorrect value" in {
+    // TODO: it allows all values of type (X, Y). So this test is redundant
+  }
+
+  it should "parse correctly" in {
+    PairSchema.fromShortString("pair", PairCodec(IntCodec, StringCodec)) shouldBe Option(PairSchema[Int, String])
+  }
+
+  it should "not parse an incorrect string" in {
+    PairSchema.fromShortString("Xair", PairCodec(StringCodec, IntCodec)) shouldBe None
+  }
+}

@@ -18,17 +18,24 @@ import commbank.grimlock.framework.{ Cell, Locate }
 import commbank.grimlock.framework.aggregate.{ Aggregator, AggregatorWithValue, Multiple, Single }
 import commbank.grimlock.framework.content.Content
 import commbank.grimlock.framework.distribution.{ CountMap, StreamingHistogram, TDigest, Quantiles }
-import commbank.grimlock.framework.encoding.Value
+import commbank.grimlock.framework.encoding.{ Codec, PairCodec, PairValue, Value }
 import commbank.grimlock.framework.extract.Extract
-import commbank.grimlock.framework.metadata.{ CategoricalType, ContinuousSchema, DiscreteSchema, NumericType }
+import commbank.grimlock.framework.metadata.{
+  CategoricalType,
+  ContinuousSchema,
+  DiscreteSchema,
+  NumericType,
+  PairSchema
+}
 import commbank.grimlock.framework.position.Position
 import commbank.grimlock.framework.statistics.Statistics
 
 import com.twitter.algebird.{ Moments => AlgeMoments, Monoid }
 
-import  scala.reflect.classTag
+import scala.reflect.{ classTag, ClassTag }
+import scala.reflect.runtime.universe.TypeTag
 
-import shapeless.HList
+import shapeless.{ HList, Nat }
 
 private[aggregate] object Aggregate {
   type O[A] = Single[A]
@@ -865,3 +872,71 @@ case class CountMapHistogram[
   )
 }
 
+/* Aggregator to create PairValues
+*
+* Given two concatenated C#U[Cell[P]] values: `left` and `right`, with unique values within them but
+* have matching coordinates between them, it will produce a single C#U with all matching coordinates
+* filled to have `PairValue`s. This operation is conceptually similar to an inner join, with the
+* difference being that if duplicates are found all rows for that entry are discarded.
+*
+* @param left         A `PairSpec` detailing the settings desired for the left data.
+* @param right        A `PairSpec` detailing the settings desired for the right data.
+* @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
+* */
+case class GeneratePair[
+  P <: HList,
+  S <: HList,
+  D <: Nat,
+  X : ClassTag : TypeTag,
+  Y : ClassTag : TypeTag
+](
+   left: PairSpec[X],
+   right: PairSpec[Y],
+   dim: D
+ )(implicit
+   ev1: Position.IndexConstraints.Aux[P, D, Value[String]]
+ ) extends Aggregator[P, S, S] {
+  type T = List[(String, Either[X, Y])]
+  type O[A] = Single[A]
+
+  val tTag = classTag[T]
+  val oTag = classTag[O[_]]
+
+  def prepare(cell: Cell[P]): Option[T] = cell.position(dim).value match {
+    case str: String if str == left.id => cell.content.value.as[X].map(d => List((str, Left(d))))
+    case str: String if str == right.id => cell.content.value.as[Y].map(d => List((str, Right(d))))
+    case _ => None
+  }
+
+  def reduce(lt: T, rt: T): T = lt ++ rt
+
+  def present(pos: Position[S], t: T): O[Cell[S]] = t match {
+    case List((str1, Left(x)), (str2, Right(y))) => createSingle(pos, x, y)
+    case List((str1, Right(y)), (str2, Left(x))) => createSingle(pos, x, y)
+    case List((str, Left(x))) =>
+      right.default.map(createSingle(pos, x, _)).getOrElse(Single())
+    case List((str, Right(y))) =>
+      left.default.map(createSingle(pos, _, y)).getOrElse(Single())
+    case _ => Single()
+  }
+
+  private def createSingle(position: Position[S], l: X, r: Y): O[Cell[S]] = {
+    Single(
+      Cell(
+        position,
+        Content(
+          PairSchema[X, Y](),
+          PairValue((l, r), PairCodec(left.codec, right.codec))
+        )
+      )
+    )
+  }
+}
+
+/** Configuration class for one side of the `GeneratePair` aggregator.
+  *
+  * @param id      String indicating the key that identifies this Spec.
+  * @param codec   A codec of type X for which the data should attempt to be cast.
+  * @param default Optionally, a default value for the data.
+  */
+case class PairSpec[X](id: String, codec: Codec[X], default: Option[X] = None)
