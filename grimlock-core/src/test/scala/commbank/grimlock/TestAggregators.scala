@@ -3721,20 +3721,20 @@ class TestGeneratePair extends TestAggregators {
   import commbank.grimlock.framework.environment.implicits.stringToValue
 
   def getPairContent[
-  X : TypeTag,
-  Y : TypeTag
+    X : TypeTag,
+    Y : TypeTag
   ](
-     left: X,
-     right: Y,
-     codec: PairCodec[X, Y],
-     schema: PairSchema[X ,Y] = PairSchema[X, Y]()
+    left: X,
+    right: Y,
+    codec: PairCodec[X, Y],
+    schema: PairSchema[X ,Y] = PairSchema[X, Y]()
    ): Content =
     Content(schema, PairValue((left, right), codec))
 
   val cellD1 = Cell(Position("left", "foo"), getDoubleContent(1))
   val cellD2 = Cell(Position("right", "foo"), getDoubleContent(2))
-  val tD1 = List(("left", Left(1)))
-  val tD2 = List(("right", Right(2)))
+  val tD1 = List(("left", Left(1.0)))
+  val tD2 = List(("right", Right(2.0)))
 
   val cellS1 = Cell(Position("left", "bar"), getStringContent("foo"))
   val cellS2 = Cell(Position("right", "bar"), getStringContent("baz"))
@@ -3744,58 +3744,38 @@ class TestGeneratePair extends TestAggregators {
   val stringDefault = "string.default"
   val doubleDefault: Double = -999.0
 
-  "A GeneratePair" should "prepare, reduce and present Doubles" in {
-    val obj = GeneratePair[P, S, _0, Double, Double](
+  "A GeneratePair" should "prepare, reduce and present" in {
+    val obj = GeneratePair[P, S, _0, Double, String](
       PairSpec("left", DoubleCodec),
-      PairSpec("right", DoubleCodec),
+      PairSpec("right", StringCodec),
       _0
     )
 
     val t1 = obj.prepare(cellD1)
     t1 shouldBe Option(tD1)
 
-    val t2 = obj.prepare(cellD2)
-    t2 shouldBe Option(tD2)
-
-    val r = obj.reduce(t1.get, t2.get)
-    r shouldBe (tD1 ++ tD2)
-
-    val c = obj.present(Position("foo"), r).result
-    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, 2.0, PairCodec(DoubleCodec, DoubleCodec))))
-  }
-
-  it should "prepare, reduce and present Strings" in {
-    val obj = GeneratePair[P, S, _0, String, String](
-      PairSpec("left", StringCodec),
-      PairSpec("right", StringCodec),
-      _0
-    )
-
-    val t1 = obj.prepare(cellS1)
-    t1 shouldBe Option(tS1)
-
     val t2 = obj.prepare(cellS2)
     t2 shouldBe Option(tS2)
 
     val r = obj.reduce(t1.get, t2.get)
-    r shouldBe (tS1 ++ tS2)
+    r shouldBe (tD1 ++ tS2)
 
     val c = obj.present(Position("foo"), r).result
-    c shouldBe Option(Cell(Position("foo"), getPairContent("foo", "baz", PairCodec(StringCodec, StringCodec))))
+    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, "baz", PairCodec(DoubleCodec, StringCodec))))
   }
 
   it should "prepare, reduce and present expanded" in {
-    val obj = GeneratePair[P, S, _0, Double, Double](
-      PairSpec("left", DoubleCodec),
+    val obj = GeneratePair[P, S, _0, String, Double](
+      PairSpec("left", StringCodec),
       PairSpec("right", DoubleCodec),
       _0
     ).andThenRelocate(_.position.append("pair").toOption)
 
-    val t1 = obj.prepare(cellD1)
+    val t1 = obj.prepare(cellS1)
     val t2 = obj.prepare(cellD2)
     val r = obj.reduce(t1.get, t2.get)
     val c = obj.present(Position("foo"), r).result
-    c shouldBe Option(Cell(Position("foo", "pair"), getPairContent(1.0, 2.0, PairCodec(DoubleCodec, DoubleCodec))))
+    c shouldBe Option(Cell(Position("foo", "pair"), getPairContent("foo", 2.0, PairCodec(StringCodec, DoubleCodec))))
   }
 
   it should "present with default values for left" in {
@@ -3839,6 +3819,19 @@ class TestGeneratePair extends TestAggregators {
     )
     val t = List.empty[(String, Either[Double, Double])]
     val c = obj.present(Position("foo"), t).result
+    c shouldBe None
+  }
+
+  it should "present empty with more than 2 values" in {
+    val obj = GeneratePair[P, S, _0, String, Double](
+      PairSpec("left", StringCodec),
+      PairSpec("right", DoubleCodec),
+      _0
+    ).andThenRelocate(_.position.append("pair").toOption)
+
+    val r  = tD2 ++ tD2 ++ tS1
+
+    val c = obj.present(Position("foo"), r).result
     c shouldBe None
   }
 }
