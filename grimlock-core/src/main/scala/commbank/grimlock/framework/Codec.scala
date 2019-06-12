@@ -637,9 +637,15 @@ object PairCodec {
     *
     * @return A `Some[PairCodec[X, Y]]` in case of success, `None` otherwise.
     */
-  def fromShortString[X : TypeTag, Y : TypeTag](str: String, xCodec: Codec[X], yCodec: Codec[Y]): Option[PairCodec[X, Y]] = str match {
+  def fromShortString[
+    X : TypeTag,
+    Y : TypeTag
+  ](
+    str: String,
+    xCodec: Codec[X],
+    yCodec: Codec[Y]
+  ): Option[PairCodec[X, Y]] = str match {
     case Pattern(sep, x, y, open, close) if xCodec.toShortString == x && yCodec.toShortString == y =>
-      // sep, open, close are regex-ed to be single length strings. So we can safely take their first element
       Option(PairCodec(xCodec, yCodec, open.head, sep.head, close.head))
     case _ => None
   }

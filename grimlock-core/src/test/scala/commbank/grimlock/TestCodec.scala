@@ -504,3 +504,4 @@ class TestPairCodec extends TestGrimlock {
     PairCodec(StringCodec, DoubleCodec).numeric.isEmpty shouldBe true
   }
 }
+

@@ -940,3 +940,4 @@ case class GeneratePair[
   * @param default Optionally, a default value for the data.
   */
 case class PairSpec[X](id: String, codec: Codec[X], default: Option[X] = None)
+

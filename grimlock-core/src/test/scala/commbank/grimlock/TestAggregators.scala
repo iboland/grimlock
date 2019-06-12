@@ -3842,3 +3842,4 @@ class TestGeneratePair extends TestAggregators {
     c shouldBe None
   }
 }
+

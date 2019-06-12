@@ -492,7 +492,12 @@ class TestPairSchema extends TestGrimlock {
   it should "validate a correct value" in {
     PairSchema[String, Double]().validate(PairValue(("abc", 1.0), PairCodec(StringCodec, DoubleCodec))) shouldBe true
     PairSchema[Timestamp, BigDecimal]()
-      .validate(PairValue((new Timestamp(date2001.getTime), one), PairCodec(TimestampCodec, DecimalCodec(5, 4)))) shouldBe true
+      .validate(
+        PairValue(
+          (new Timestamp(date2001.getTime), one),
+          PairCodec(TimestampCodec, DecimalCodec(5, 4))
+        )
+      ) shouldBe true
   }
 
   it should "not validate an incorrect value" in {
@@ -507,3 +512,4 @@ class TestPairSchema extends TestGrimlock {
     PairSchema.fromShortString("Xair", PairCodec(StringCodec, IntCodec)) shouldBe None
   }
 }
+
