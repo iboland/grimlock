@@ -23,6 +23,7 @@ import java.util.Date
 import scala.math.BigDecimal
 import scala.util.{ Success, Try }
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.matching.Regex
 
 import shapeless.{ :+:, CNil, Coproduct }
 import shapeless.ops.coproduct.Inject
@@ -586,15 +587,15 @@ case object LongCodec extends Codec[Long] {
 
 /** Codec for dealing with a pair of values. Each value must have a corresponding `Codec`. */
 case class PairCodec[
-X : TypeTag,
-Y : TypeTag
+  X : TypeTag,
+  Y : TypeTag
 ](
    xCodec: Codec[X],
    yCodec: Codec[Y],
    open: Char = '(',
-   separator: Char = ',',
+   sep: Char = ',',
    close: Char = ')'
- ) extends Codec[(X, Y)] { self =>
+) extends Codec[(X, Y)] { self =>
   val converters: Set[Codec.Convert[(X, Y)]] = Set.empty
   val date: Option[((X, Y)) => Date] = None
   val integral: Option[Integral[(X, Y)]] = None
@@ -605,30 +606,27 @@ Y : TypeTag
 
   def box(value: (X, Y)): Value[(X, Y)] = PairValue(value, this)
 
-  def compare(
-               x: (X, Y),
-               y: (X, Y)
-             ): Int = if (xCodec.compare(x._1, y._1) == 0) yCodec.compare(x._2, y._2) else xCodec.compare(x._1, y._1)
+  def compare(x: (X, Y), y: (X, Y)): Int =
+    if (xCodec.compare(x._1, y._1) == 0)
+      yCodec.compare(x._2, y._2)
+    else
+      xCodec.compare(x._1, y._1)
 
-  def decode(
-              str: String
-            ): Option[(X, Y)] = {
-    val pattern = s"\\${open}(.+)\\${separator}(.+)\\${close}".r
-    val (x, y) = str match {
-      case pattern(left, right) => (xCodec.decode(left), yCodec.decode(right))
-      case _ => (None, None)
-    }
-    for (a <- x; b <- y) yield (a, b)
+  def decode(str: String): Option[(X, Y)] = str match {
+    case decodePattern(left, right) => for (l <- xCodec.decode(left); r <- yCodec.decode(right)) yield (l, r)
+    case _ => None
   }
 
-  def encode(value: (X, Y)): String = s"${open}${xCodec.encode(value._1)}${separator}${yCodec.encode(value._2)}${close}"
+  def encode(value: (X, Y)): String = s"${open}${xCodec.encode(value._1)}${sep}${yCodec.encode(value._2)}${close}"
 
-  def toShortString = s"pair${separator.toString}${xCodec.toShortString}${separator.toString}${yCodec.toShortString}${separator.toString}${open.toString}${separator.toString}${close.toString}"
+  def toShortString = s"pair${sep}${xCodec.toShortString}${sep}${yCodec.toShortString}${sep}${open}${sep}${close}"
+
+  private val decodePattern: Regex = s"\\${open}(.+)\\${sep}(.+)\\${close}".r
 }
 
 object PairCodec {
   /** Pattern for parsing `PairCodec` from string with xCodec and yCodec provided. */
-  val Pattern = raw"pair(.)(.+)\1(.+)\1(.)\1(.)".r
+  val Pattern: Regex = raw"pair(.)(.+)\1(.+)\1(.)\1(.)".r
 
   /**
     * Parse a PairCodec[X, Y] from a string.

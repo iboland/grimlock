@@ -912,11 +912,11 @@ case class GeneratePair[
 
   def present(pos: Position[S], t: T): O[Cell[S]] = t match {
     case List((str1, Left(x)), (str2, Right(y))) => createSingle(pos, x, y)
-    case List((str1, Right(y)), (str2, Left(x))) => createSingle(pos, x, y)
-    case List((str, Left(x))) =>
-      right.default.map(createSingle(pos, x, _)).getOrElse(Single())
-    case List((str, Right(y))) =>
-      left.default.map(createSingle(pos, _, y)).getOrElse(Single())
+    case List((str1, Right(x)), (str2, Left(y))) => createSingle(pos, y, x)
+    case List((str, Left(v))) =>
+      right.default.map(createSingle(pos, v, _)).getOrElse(Single())
+    case List((str, Right(v))) =>
+      left.default.map(createSingle(pos, _, v)).getOrElse(Single())
     case _ => Single()
   }
 

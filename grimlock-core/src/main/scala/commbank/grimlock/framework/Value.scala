@@ -27,30 +27,32 @@ import scala.util.matching.Regex
 /** Trait for variable values. */
 trait Value[T] {
 
-  /** TypeTag of type of the Value. */
-  protected val ttag: TypeTag[T]
-
   /** The codec used to encode/decode this value. */
   val codec: Codec[T]
 
   /** The encapsulated value. */
   val value: T
 
+  /**
+    * Set of ClassTags for which conversion to an `X` within the `as` method is only
+    * allowed if the full type of `X` matches the full type of `T`.
+    */
+  protected val requireEqual: Set[ClassTag[_]] = Set(classTag[List[_]], classTag[Tuple2[_, _]])
+
+  /** TypeTag of `T`. */
+  protected val ttag: TypeTag[T]
+
   /** Return value as `X` (if an appropriate converter exists), or `None` if the conversion is not supported. */
   def as[X : ClassTag: TypeTag]: Option[X] = {
     val ct = implicitly[ClassTag[X]]
-    /** ClassTag's are unable to check parameters within classes. So for a set of ClassTags we wish to
-      * match on exact typeTags. For these sets all converters will result in None, because we test based
-      * on ttag: TypeTag[T]. */
-    val typeTagSet: Set[ClassTag[_]] = Set(classTag[Tuple1[_]], classTag[Tuple2[_, _]], classTag[List[_]])
 
     def cast(v: Any): Option[X] = v match {
-      case ct(x) if typeTagSet.contains(ct) => castTypeTag(v)
+      case ct(x) if requireEqual.contains(ct) => castIfEqual(v)
       case ct(x) => Option(x)
       case _ => None
     }
 
-    def castTypeTag(v: Any): Option[X] = v match {
+    def castIfEqual(v: Any): Option[X] = v match {
       case ct(x) if typeTag[X] == ttag => Option(x)
       case _ => None
     }
