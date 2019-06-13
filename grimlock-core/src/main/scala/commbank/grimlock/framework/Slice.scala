@@ -99,7 +99,10 @@ object Over {
     ev1: Position.IndexConstraints[P, D :: HNil] { type V <: HList },
     ev2: Position.RemoveConstraints[P, D :: HNil],
     ev3: Witness.Aux[D]
-  ): Over[P, D :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: HNil)
+  ): Over[P, D :: HNil, ev1.V, ev2.Q] =
+    // implicits must be passed explicitly to case class constructor so the compiler knows which constructor is
+    // being called. Same behaviour for the other apply methods which use types
+    Over(ev3.value :: HNil)(ev1, ev2)
 
   /** Construct an `Over` for 2 dimensions using types. */
   def apply[
@@ -111,7 +114,7 @@ object Over {
     ev2: Position.RemoveConstraints[P, D :: E :: HNil],
     ev3: Witness.Aux[D],
     ev4: Witness.Aux[E]
-  ): Over[P, D :: E :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: ev4.value :: HNil)
+  ): Over[P, D :: E :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: ev4.value :: HNil)(ev1, ev2)
 }
 
 /**
@@ -186,7 +189,7 @@ object Along {
     ev1: Position.IndexConstraints[P, D :: HNil] { type V <: HList },
     ev2: Position.RemoveConstraints[P, D :: HNil],
     ev3: Witness.Aux[D]
-  ): Along[P, D :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: HNil)
+  ): Along[P, D :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: HNil)(ev1, ev2)
 
   /** Construct an `Along` for 2 dimensions using types. */
   def apply[
@@ -198,6 +201,6 @@ object Along {
     ev2: Position.RemoveConstraints[P, D :: E :: HNil],
     ev3: Witness.Aux[D],
     ev4: Witness.Aux[E]
-  ): Along[P, D :: E :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: ev4.value :: HNil)
+  ): Along[P, D :: E :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: ev4.value :: HNil)(ev1, ev2)
 }
 
