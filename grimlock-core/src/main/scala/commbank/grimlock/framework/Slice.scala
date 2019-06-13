@@ -54,9 +54,7 @@ case class Over[
 /** Companion object to `Over` case class. */
 object Over {
   /**
-   * Construct an `Over` for 1 dimension. Implicit parameter order is different from the case class constructor to
-   * avoid duplicate symbols compiler error. Without the re-ordering, the erasure of type parameters at run time makes
-   * the apply method indistinguishable from the case class constructor.
+   * Construct an `Over` for 1 dimension.
    *
    * @param dimension Dimension of the selected coordinate.
    */
@@ -68,6 +66,7 @@ object Over {
   ](
     dimension: D
   )(implicit
+    // different parameter order to case class needed to prevent duplicate symbols compile error
     ev1: Position.RemoveConstraints.Aux[P, D, R],
     ev2: Position.IndexConstraints.Aux[P, D, V]
   ): Over[P, D :: HNil, V :: HNil, R] = Over(dimension :: HNil)
@@ -100,7 +99,7 @@ object Over {
     ev1: Position.IndexConstraints[P, D :: HNil] { type V <: HList },
     ev2: Position.RemoveConstraints[P, D :: HNil],
     ev3: Witness.Aux[D]
-  ): Over[P, D :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: HNil)(ev1, ev2)
+  ): Over[P, D :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: HNil)
 
   /** Construct an `Over` for 2 dimensions using types. */
   def apply[
@@ -112,7 +111,7 @@ object Over {
     ev2: Position.RemoveConstraints[P, D :: E :: HNil],
     ev3: Witness.Aux[D],
     ev4: Witness.Aux[E]
-  ): Over[P, D :: E :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: ev4.value :: HNil)(ev1, ev2)
+  ): Over[P, D :: E :: HNil, ev1.V, ev2.Q] = Over(ev3.value :: ev4.value :: HNil)
 }
 
 /**
@@ -142,9 +141,7 @@ case class Along[
 /** Companion object to `Along` case class. */
 object Along {
   /**
-   * Construct an `Along` for 1 dimension. Implicit parameter order is different from the case class constructor to
-   * avoid duplicate symbols compiler error. Without the re-ordering, the erasure of type parameters at run time makes
-   * the apply method indistinguishable from the case class constructor.
+   * Construct an `Along` for 1 dimension.
    *
    * @param dimension Dimension of the coordinate to exclude.
    */
@@ -156,6 +153,7 @@ object Along {
   ](
     dimension: D
   )(implicit
+    // different parameter order to case class needed to prevent duplicate symbols compile error
     ev1: Position.RemoveConstraints.Aux[P, D, S],
     ev2: Position.IndexConstraints.Aux[P, D, V]
   ): Along[P, D :: HNil, V :: HNil, S] = Along(dimension :: HNil)
@@ -188,7 +186,7 @@ object Along {
     ev1: Position.IndexConstraints[P, D :: HNil] { type V <: HList },
     ev2: Position.RemoveConstraints[P, D :: HNil],
     ev3: Witness.Aux[D]
-  ): Along[P, D :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: HNil)(ev1, ev2)
+  ): Along[P, D :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: HNil)
 
   /** Construct an `Along` for 2 dimensions using types. */
   def apply[
@@ -200,6 +198,6 @@ object Along {
     ev2: Position.RemoveConstraints[P, D :: E :: HNil],
     ev3: Witness.Aux[D],
     ev4: Witness.Aux[E]
-  ): Along[P, D :: E :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: ev4.value :: HNil)(ev1, ev2)
+  ): Along[P, D :: E :: HNil, ev1.V, ev2.Q] = Along(ev3.value :: ev4.value :: HNil)
 }
 
