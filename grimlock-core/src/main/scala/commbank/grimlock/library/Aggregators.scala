@@ -865,3 +865,103 @@ case class CountMapHistogram[
   )
 }
 
+/**
+ * Compute confusion matrix.
+ *
+ * @param accuracy  The name for the accuracy.
+ * @param f1        The name for the F1-score.
+ * @param fdr       The name for the false discovery rate.
+ * @param fn        The name for the number of false negatives.
+ * @param fp        The name for the number of false positives.
+ * @param map       Returns (actual binary outcome, predicted binary outcome) from a `Cell`.
+ * @param precision The name for the precision.
+ * @param recall    The name for the recall.
+ * @param tn        The name for the number of true negatives.
+ * @param tp        The name for the number of true positives.
+ */
+case class ConfusionMatrixAggregator[
+  P <: HList,
+  S <: HList,
+  Q <: HList
+](
+  map: Cell[P] => Option[(Boolean, Boolean)]
+)(
+  accuracy: Locate.FromPosition[S, Q],
+  f1: Locate.FromPosition[S, Q],
+  fdr: Locate.FromPosition[S, Q],
+  fn: Locate.FromPosition[S, Q],
+  fp: Locate.FromPosition[S, Q],
+  precision: Locate.FromPosition[S, Q],
+  recall: Locate.FromPosition[S, Q],
+  tn: Locate.FromPosition[S, Q],
+  tp: Locate.FromPosition[S, Q]
+)(implicit
+  ev: Value.Box[Double]
+) extends Aggregator[P, S, Q] {
+  type T = ConfusionMatrix
+  type O[A] = Multiple[A]
+
+  val tTag = classTag[T]
+  val oTag = classTag[O[_]]
+
+  def prepare(cell: Cell[P]): Option[T] = map(cell) match {
+    case Some((true, true)) => Option(ConfusionMatrix(tp = 1))
+    case Some((false, true)) => Option(ConfusionMatrix(fp = 1))
+    case Some((true, false)) => Option(ConfusionMatrix(fn = 1))
+    case Some((false, false)) => Option(ConfusionMatrix(tn = 1))
+    case _ => None
+  }
+
+  def reduce(lt: T, rt: T): T = lt + rt
+
+  def present(pos: Position[S], t: T): O[Cell[Q]] = Multiple(
+    List(
+      accuracy(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.accuracy)) },
+      f1(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.f1Score)) },
+      fdr(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fdr)) },
+      fn(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fn.toDouble)) },
+      fp(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fp.toDouble)) },
+      precision(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.precision)) },
+      recall(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.recall)) },
+      tn(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tn.toDouble)) },
+      tp(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
+    ).flatten
+  )
+}
+
+/**
+ * Case class for a confusion matrix.
+ *
+ * @param tp number of true positives.
+ * @param fp number of false positives.
+ * @param fn number of false negatives.
+ * @param tn number of true negatives.
+ */
+case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
+  /**
+   * Add two confusion matrices together.
+   *
+   * @param that The `ConfusionMatrix` to add.
+   *
+   * @return A `ConfusionMatrix` with the metrics (`tp`, `fp`, `fn` and `tn`) added together from this and `that`.
+   */
+  def +(that: ConfusionMatrix): ConfusionMatrix = ConfusionMatrix(tp + that.tp, fp + that.fp, fn + that.fn, tn + that.tn)
+
+  /** Calculate the accuracy. */
+  def accuracy: Double = (tp + tn) / total.toDouble
+
+  /** Calculate the F1-score. */
+  def f1Score: Double = 2 * tp / (2 * tp + fp + fn).toDouble
+
+  /** Calculate the false discovery rate. */
+  def fdr: Double = fp / (fp + tp).toDouble
+
+  /** Calculate the precision. */
+  def precision: Double = tp / (tp + fp).toDouble
+
+  /** Calculate the recall. */
+  def recall: Double = tp.toDouble / (tp + fn).toDouble
+
+  private def total: Int = tp + fp + fn + tn
+}
+

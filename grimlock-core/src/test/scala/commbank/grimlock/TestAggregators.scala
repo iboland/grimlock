@@ -24,13 +24,24 @@ import commbank.grimlock.framework.position._
 
 import commbank.grimlock.library.aggregate._
 
-import shapeless.{ ::, HNil, Nat }
-import shapeless.nat.{ _0, _1 }
+import shapeless.{ ::, HList, HNil, Nat }
+import shapeless.nat.{ _0, _1, _3 }
 
 trait TestAggregators extends TestGrimlock {
   type P = Value[String] :: Value[String] :: HNil
   type S = Value[String] :: HNil
 
+  /** Append a string to the position. */
+  def appendString[
+    Z <: HList
+  ](
+    str: String
+  )(implicit
+    ev1: Value.Box[String],
+    ev2: Position.AppendConstraints[Z, Value[String]]
+  ): Locate.FromPosition[Z, ev2.Q] = (pos: Position[Z]) => pos.append(str).toOption
+
+  def getBooleanContent(value: Boolean): Content = Content(NominalSchema[Boolean](), value)
   def getLongContent(value: Long): Content = Content(DiscreteSchema[Long](), value)
   def getDoubleContent(value: Double): Content = Content(ContinuousSchema[Double](), value)
   def getStringContent(value: String): Content = Content(NominalSchema[String](), value)
@@ -3711,6 +3722,148 @@ class TestCountMapHistogram extends TestAggregators {
       Cell(Position("foo", "2.0", "hist"), getLongContent(1)),
       Cell(Position("foo", "bar", "hist"), getLongContent(2)),
       Cell(Position("foo", "baz", "hist"), getLongContent(1))
+    )
+  }
+}
+
+class TestConfusionMatrixAggregator extends TestAggregators {
+  import commbank.grimlock.framework.environment.implicits.stringToValue
+
+  type Q = Value[Boolean] :: Value[Double] :: P
+
+  val cell1 = binaryCell(Position("foo", "bar"), 0.5, true)
+  val cell2 = binaryCell(Position("foo", "baz"), 0.5, true)
+  val map = makeThresholdMap(_3, _0, _1, Map("bar" -> 0.3, "baz" -> 0.7))
+  val pos = Position("foo")
+  val posPrepend = Position("baz", "foo")
+
+  val accuracy = appendString[S]("accuracy")
+  val f1score = appendString[S]("f1score")
+  val fdr = appendString[S]("fdr")
+  val fn = appendString[S]("fn")
+  val fp = appendString[S]("fp")
+  val precision = appendString[S]("precision")
+  val recall = appendString[S]("recall")
+  val tn = appendString[S]("tn")
+  val tp = appendString[S]("tp")
+
+  val accuracyP = appendString[P]("accuracy")
+  val f1scoreP = appendString[P]("f1score")
+  val fdrP = appendString[P]("fdr")
+  val fnP = appendString[P]("fn")
+  val fpP = appendString[P]("fp")
+  val precisionP = appendString[P]("precision")
+  val recallP = appendString[P]("recall")
+  val tnP = appendString[P]("tn")
+  val tpP = appendString[P]("tp")
+
+  def binaryCell[
+    Z <: HList,
+    W <: HList
+  ](
+    pos: Position[Z],
+    score: Double,
+    outcome: Boolean
+  )(implicit
+    ev1: Position.PrependConstraints.Aux[Z, Value[Double], Value[Double] :: Z],
+    ev2: Position.PrependConstraints.Aux[Value[Double] :: Z, Value[Boolean], W]
+  ) = Cell(pos.prepend(score).prepend(outcome), getBooleanContent(true))
+
+  def makeThresholdMap[
+    D <: Nat,
+    Ou <: Nat,
+    Sc <: Nat,
+    Id
+  ](
+    dim: D,
+    outcome: Ou,
+    score: Sc,
+    map: Map[Id, Double]
+  )(implicit
+    ev1: Position.IndexConstraints.Aux[Q, D, Value[Id]],
+    ev2: Position.IndexConstraints.Aux[Q, Ou, Value[Boolean]],
+    ev3: Position.IndexConstraints.Aux[Q, Sc, Value[Double]]
+  ): Cell[Q] => Option[(Boolean, Boolean)] = {
+    cell: Cell[Q] => for {
+      threshold <- map.get(cell.position(dim).value)
+      o <- cell.position(outcome).as[Boolean]
+      s <- cell.position(score).as[Double].map(_ > threshold)
+    } yield (o, s)
+  }
+
+  "A ConfusionMatrix" should "prepare, reduce and present" in {
+    val obj = ConfusionMatrixAggregator(
+      map
+    )(
+      accuracy,
+      f1score,
+      fdr,
+      fn,
+      fp,
+      precision,
+      recall,
+      tn,
+      tp
+    )
+
+    val t1 = obj.prepare(cell1)
+    t1 shouldBe Option(ConfusionMatrix(tp = 1))
+
+    val t2 = obj.prepare(cell2)
+    t2 shouldBe Option(ConfusionMatrix(fn = 1))
+
+    val r = obj.reduce(t1.get, t2.get)
+    r shouldBe ConfusionMatrix(tp = 1, fn = 1)
+
+    val c = obj.present(pos, r).result
+    c shouldBe List(
+      Cell(accuracy(pos).get, getDoubleContent(0.5)),
+      Cell(f1score(pos).get, getDoubleContent(0.6666666666666666)),
+      Cell(fdr(pos).get, getDoubleContent(0.0)),
+      Cell(fn(pos).get, getDoubleContent(1.0)),
+      Cell(fp(pos).get, getDoubleContent(0.0)),
+      Cell(precision(pos).get, getDoubleContent(1.0)),
+      Cell(recall(pos).get, getDoubleContent(0.5)),
+      Cell(tn(pos).get, getDoubleContent(0.0)),
+      Cell(tp(pos).get, getDoubleContent(1.0))
+    )
+  }
+
+  it should "prepare, reduce and present expanded" in {
+    val obj = ConfusionMatrixAggregator(
+      map
+    )(
+      accuracy,
+      f1score,
+      fdr,
+      fn,
+      fp,
+      precision,
+      recall,
+      tn,
+      tp
+    ).andThenRelocate(_.position.prepend("baz").toOption)
+
+    val t1 = obj.prepare(cell1)
+    t1 shouldBe Option(ConfusionMatrix(tp = 1))
+
+    val t2 = obj.prepare(cell2)
+    t2 shouldBe Option(ConfusionMatrix(fn = 1))
+
+    val r = obj.reduce(t1.get, t2.get)
+    r shouldBe ConfusionMatrix(tp = 1, fn = 1)
+
+    val c = obj.present(pos, r).result.toList
+    c.sortBy(_.position) shouldBe List(
+      Cell(accuracyP(posPrepend).get, getDoubleContent(0.5)),
+      Cell(f1scoreP(posPrepend).get, getDoubleContent(0.6666666666666666)),
+      Cell(fdrP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(fnP(posPrepend).get, getDoubleContent(1.0)),
+      Cell(fpP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(precisionP(posPrepend).get, getDoubleContent(1.0)),
+      Cell(recallP(posPrepend).get, getDoubleContent(0.5)),
+      Cell(tnP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(tpP(posPrepend).get, getDoubleContent(1.0))
     )
   }
 }
