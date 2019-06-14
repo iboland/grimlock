@@ -900,9 +900,9 @@ case class GeneratePair[
    left: PairSpec[X],
    right: PairSpec[Y],
    dim: D
- )(implicit
+)(implicit
    ev1: Position.IndexConstraints.Aux[P, D, Value[String]]
- ) extends Aggregator[P, S, S] {
+) extends Aggregator[P, S, S] {
   type T = List[(String, Either[X, Y])]
   type O[A] = Single[A]
 

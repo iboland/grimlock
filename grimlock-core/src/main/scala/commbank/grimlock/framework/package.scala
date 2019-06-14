@@ -21,6 +21,8 @@ import commbank.grimlock.framework.encoding.{
   FloatValue,
   IntValue,
   LongValue,
+  PairCodec,
+  PairValue,
   StringValue,
   TimestampValue,
   TypeValue,
@@ -29,6 +31,8 @@ import commbank.grimlock.framework.encoding.{
 import commbank.grimlock.framework.metadata.Type
 
 import java.sql.Timestamp
+
+import scala.reflect.runtime.universe.TypeTag
 
 import shapeless.{ ::, HNil }
 
@@ -60,6 +64,16 @@ package environment {
 
     /** Converts a `Type` to a `Value`. */
     implicit def typeToValue(t: Type): Value[Type] = TypeValue(t)
+
+    /** Converts a `(X, Y)` to a `PairValue[X, Y]`, applying the default `PairCodec[X, Y]` values. */
+    implicit def pairToValue[
+      X: TypeTag,
+      Y: TypeTag
+    ](t: (X, Y)
+    )(implicit
+      xToValue: Value.Box[X],
+      yToValue: Value.Box[Y]
+    ) = PairValue(t, PairCodec(t._1.codec, t._2.codec))
   }
 }
 
