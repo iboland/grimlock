@@ -590,11 +590,11 @@ case class PairCodec[
   X : TypeTag,
   Y : TypeTag
 ](
-   xCodec: Codec[X],
-   yCodec: Codec[Y],
-   open: Char = '(',
-   sep: Char = ',',
-   close: Char = ')'
+  xCodec: Codec[X],
+  yCodec: Codec[Y],
+  open: Char = '(',
+  sep: Char = ',',
+  close: Char = ')'
 ) extends Codec[(X, Y)] { self =>
   val converters: Set[Codec.Convert[(X, Y)]] = Set.empty
   val date: Option[((X, Y)) => Date] = None

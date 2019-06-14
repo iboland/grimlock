@@ -872,17 +872,24 @@ case class CountMapHistogram[
   )
 }
 
-/* Aggregator to create PairValues
-*
-* Given two concatenated C#U[Cell[P]] values: `left` and `right`, with unique values within them but
-* have matching coordinates between them, it will produce a single C#U with all matching coordinates
-* filled to have `PairValue`s. This operation is conceptually similar to an inner join, with the
-* difference being that if duplicates are found all rows for that entry are discarded.
-*
-* @param left         A `PairSpec` detailing the settings desired for the left data.
-* @param right        A `PairSpec` detailing the settings desired for the right data.
-* @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
-* */
+/**
+  * Aggregator to create PairValues
+  *
+  * Aggregate a list of cells down into pairs of values that match according to all coordinates in a slice `S`
+  * bar one at dimension `D`. The result is a list of cells with all values filled to have `PairValue`s.
+  *
+  * At `D` the accepted positional values are specified as the ids for `left` and `right`.
+  * Contents found at any other coordinates of `D` are discarded. If more than two values are found for any of the
+  * `left` or `right` coordinates, all values at those coordinates are discarded. Optionally, impute a default value
+  * if only one value found for the specified `D` coordinates.
+  *
+  * This operation is conceptually similar to an inner join, with the
+  * difference being that if duplicates are found all rows for that entry are discarded.
+  *
+  * @param left         A `PairSpec` detailing the settings desired for the left data.
+  * @param right        A `PairSpec` detailing the settings desired for the right data.
+  * @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
+  */
 case class GeneratePair[
   P <: HList,
   S <: HList,
@@ -927,7 +934,8 @@ case class GeneratePair[
   }
 }
 
-/** Configuration class for one side of the `GeneratePair` aggregator.
+/**
+  * Configuration class for one side of the `GeneratePair` aggregator.
   *
   * @param id      String indicating the key that identifies this Spec.
   * @param codec   A codec of type X for which the data should attempt to be cast.
@@ -1023,11 +1031,12 @@ case class ConfusionMatrixAggregator[
 }
 
 /**
-  * Case class for a ConfusionMatrix
-  * @param tp number of true positives
-  * @param fp number of false positives
-  * @param fn number of false negatives
-  * @param tn number of true negatives
+  * Case class for a confusion matrix.
+  *
+  * @param tp number of true positives.
+  * @param fp number of false positives.
+  * @param fn number of false negatives.
+  * @param tn number of true negatives.
   */
 case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
   def +(that: ConfusionMatrix): ConfusionMatrix =
