@@ -1,6 +1,6 @@
 language: scala
 jdk:
-- openjdk11
+- oraclejdk8
 sudo: false
 cache:
   directories:
