@@ -52,7 +52,7 @@ trait Value[T] {
     }
 
     def castIfEqual(v: Any): Option[X] = v match {
-      case ct(x) if typeTag[X] == ttag => Option(x)
+      case ct(x) if ttag.tpe =:= typeTag[X].tpe => Option(x)
       case _ => None
     }
 
