@@ -19,7 +19,7 @@ import commbank.grimlock.framework.aggregate.{ Aggregator, AggregatorWithValue, 
 import commbank.grimlock.framework.content.Content
 import commbank.grimlock.framework.distribution.{ CountMap, StreamingHistogram, TDigest, Quantiles }
 import commbank.grimlock.framework.encoding.{ Codec, PairCodec, PairValue, Value }
-import commbank.grimlock.framework.extract.Extract
+import commbank.grimlock.framework.extract.{ Extract, ExtractWithSelected }
 import commbank.grimlock.framework.metadata.{
   CategoricalType,
   ContinuousSchema,
@@ -934,4 +934,116 @@ case class GeneratePair[
   * @param default Optionally, a default value for the data.
   */
 case class PairSpec[X](id: String, codec: Codec[X], default: Option[X] = None)
+
+/**
+  * Compute confusion matrix
+  *
+  * @param accuracy           The name for the accuracy.
+  * @param extractor          Extractor that specifies the Slice of Position[P] for which the functionMap should be
+  *                           matched upon.
+  * @param f1Score            The name for the F1-score.
+  * @param fdr                The name for the false discovery rate.
+  * @param fn                 The name for the number of false negatives.
+  * @param fp                 The name for the number of false positives.
+  * @param precision          The name for the precision.
+  * @param recall             The name for the recall.
+  * @param tn                 The name for the number of true negatives.
+  * @param tp                 The name for the number of true positives.
+  * @param functionMap        A map from a slice of the Position[P] to a link function, which will be used to align
+  *                           scores and outcomes.
+  *
+  * @note The values for each cell is expected to be a PairValue[Boolean, Double] where the elements are the
+  *       outcome and the score respectively.
+  */
+case class ConfusionMatrixAggregator[
+  P <: HList,
+  S <: HList,
+  Q <: HList,
+  S1 <: HList,
+  R1 <: HList
+](
+  extractor: ExtractWithSelected[P, S1, R1, Double => Boolean],
+  functionMap: Map[Position[S1], Double => Boolean]
+)(
+  accuracy: Locate.FromPosition[S, Q],
+  f1Score: Locate.FromPosition[S, Q],
+  fdr: Locate.FromPosition[S, Q],
+  fn: Locate.FromPosition[S, Q],
+  fp: Locate.FromPosition[S, Q],
+  precision: Locate.FromPosition[S, Q],
+  recall: Locate.FromPosition[S, Q],
+  tn: Locate.FromPosition[S, Q],
+  tp: Locate.FromPosition[S, Q]
+)(implicit
+  ev1: Value.Box[Double]
+) extends Aggregator[P, S, Q] {
+  type outcome = Boolean
+  type score = Double
+
+  type T = ConfusionMatrix
+  type O[A] = Multiple[A]
+
+  val tTag = classTag[T]
+  val oTag = classTag[O[_]]
+
+  def prepare(cell: Cell[P]): Option[T] = {
+    val linkFunction = extractor.extract(cell, functionMap)
+
+    linkFunction
+      .flatMap { fn =>
+        cell.content.value.as[(outcome, score)] match {
+          case Some((o, s)) if fn(s) && o => Some(ConfusionMatrix(tp = 1))
+          case Some((o, s)) if fn(s) && !o => Some(ConfusionMatrix(fp = 1))
+          case Some((o, s)) if !fn(s) && o => Some(ConfusionMatrix(fn = 1))
+          case Some((o, s)) if !fn(s) && !o => Some(ConfusionMatrix(tn = 1))
+          case _ => None
+        }
+      }
+  }
+
+  def reduce(lt: T, rt: T): T = lt + rt
+
+  def present(pos: Position[S], t: T): O[Cell[Q]] = {
+    Multiple(
+      List(
+        accuracy(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.accuracy)) },
+        f1Score(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.f1Score)) },
+        fdr(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.fdr)) },
+        fn(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.fn.toDouble)) },
+        fp(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.fp.toDouble)) },
+        precision(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.precision)) },
+        recall(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.recall)) },
+        tn(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.tn.toDouble)) },
+        tp(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
+      ).flatten
+    )
+  }
+
+
+}
+
+/**
+  * Case class for a ConfusionMatrix
+  * @param tp number of true positives
+  * @param fp number of false positives
+  * @param fn number of false negatives
+  * @param tn number of true negatives
+  */
+case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
+  def +(that: ConfusionMatrix): ConfusionMatrix =
+    ConfusionMatrix(
+      tp + that.tp,
+      fp + that.fp,
+      fn + that.fn,
+      tn + that.tn
+    )
+
+  def accuracy: Double = (tp + tn) / total.toDouble
+  def f1Score: Double = 2 * tp / (2 * tp + fp + fn).toDouble
+  def fdr: Double = fp / (fp + tp).toDouble
+  def precision: Double = tp / (tp + fp).toDouble
+  def recall: Double = tp.toDouble / (tp + fn).toDouble
+
+  private def total: Int = tp + fp + fn + tn
+}
 

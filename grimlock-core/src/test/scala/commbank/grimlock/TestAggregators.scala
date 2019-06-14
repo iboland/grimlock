@@ -24,7 +24,7 @@ import commbank.grimlock.framework.position._
 
 import commbank.grimlock.library.aggregate._
 
-import shapeless.{ ::, HNil, Nat }
+import shapeless.{ ::, HList, HNil, Nat }
 import shapeless.nat.{ _0, _1 }
 
 import scala.reflect.runtime.universe.TypeTag
@@ -36,6 +36,25 @@ trait TestAggregators extends TestGrimlock {
   def getLongContent(value: Long): Content = Content(DiscreteSchema[Long](), value)
   def getDoubleContent(value: Double): Content = Content(ContinuousSchema[Double](), value)
   def getStringContent(value: String): Content = Content(NominalSchema[String](), value)
+  def getPairContent[
+    X : TypeTag,
+    Y : TypeTag
+  ](
+    left: X,
+    right: Y,
+    codec: PairCodec[X, Y],
+    schema: PairSchema[X ,Y] = PairSchema[X, Y]()
+   ): Content = Content(schema, PairValue((left, right), codec))
+
+  /** Append a string to the position. */
+  def appendString[
+    Z <: HList
+  ](
+    str: String
+  )(implicit
+    ev1: Value.Box[String],
+    ev2: Position.AppendConstraints[Z, Value[String]]
+  ): Locate.FromPosition[Z, ev2.Q] = (pos: Position[Z]) => pos.append(str).toOption
 }
 
 class TestCounts extends TestAggregators {
@@ -3720,17 +3739,6 @@ class TestCountMapHistogram extends TestAggregators {
 class TestGeneratePair extends TestAggregators {
   import commbank.grimlock.framework.environment.implicits.stringToValue
 
-  def getPairContent[
-    X : TypeTag,
-    Y : TypeTag
-  ](
-    left: X,
-    right: Y,
-    codec: PairCodec[X, Y],
-    schema: PairSchema[X ,Y] = PairSchema[X, Y]()
-   ): Content =
-    Content(schema, PairValue((left, right), codec))
-
   val cellD1 = Cell(Position("left", "foo"), getDoubleContent(1))
   val cellD2 = Cell(Position("right", "foo"), getDoubleContent(2))
   val tD1 = List(("left", Left(1.0)))
@@ -3833,6 +3841,119 @@ class TestGeneratePair extends TestAggregators {
 
     val c = obj.present(Position("foo"), r).result
     c shouldBe None
+  }
+}
+
+class TestConfusionMatrixAggregator extends TestAggregators {
+  import commbank.grimlock.framework.environment.implicits.stringToValue
+
+  def binaryCell[Z <: HList](pos: Position[Z], score: Double, outcome: Boolean) =
+    Cell(pos, getPairContent(outcome, score, PairCodec(BooleanCodec, DoubleCodec)))
+
+  val cell1 = binaryCell(Position("foo", "bar"), 0.5, true)
+  val cell2 = binaryCell(Position("foo", "baz"), 0.5, true)
+  val pos = Position("foo")
+  val posPrepend = Position("baz", "foo")
+
+  val fnMap = Map(Position("bar") -> ((x: Double) => x > 0.3), Position("baz") -> ((x: Double) => x > 0.7))
+  val extractor = ExtractWithSelected[P, S, S, Double => Boolean](Over(_1))
+
+  val accuracy = appendString[S]("accuracy")
+  val f1score = appendString[S]("f1score")
+  val fdr = appendString[S]("fdr")
+  val fn = appendString[S]("fn")
+  val fp = appendString[S]("fp")
+  val precision = appendString[S]("precision")
+  val recall = appendString[S]("recall")
+  val tn = appendString[S]("tn")
+  val tp = appendString[S]("tp")
+
+  val accuracyP = appendString[P]("accuracy")
+  val f1scoreP = appendString[P]("f1score")
+  val fdrP = appendString[P]("fdr")
+  val fnP = appendString[P]("fn")
+  val fpP = appendString[P]("fp")
+  val precisionP = appendString[P]("precision")
+  val recallP = appendString[P]("recall")
+  val tnP = appendString[P]("tn")
+  val tpP = appendString[P]("tp")
+
+  "A ConfusionMatrix" should "prepare, reduce and present" in {
+    val obj = ConfusionMatrixAggregator(
+      extractor,
+      fnMap
+    )(
+      accuracy,
+      f1score,
+      fdr,
+      fn,
+      fp,
+      precision,
+      recall,
+      tn,
+      tp
+    )
+
+    val t1 = obj.prepare(cell1)
+    t1 shouldBe Option(ConfusionMatrix(tp = 1))
+
+    val t2 = obj.prepare(cell2)
+    t2 shouldBe Option(ConfusionMatrix(fn = 1))
+
+    val r = obj.reduce(t1.get, t2.get)
+    r shouldBe ConfusionMatrix(tp = 1, fn = 1)
+
+    val c = obj.present(pos, r).result
+    c shouldBe List(
+      Cell(accuracy(pos).get, getDoubleContent(0.5)),
+      Cell(f1score(pos).get, getDoubleContent(0.6666666666666666)),
+      Cell(fdr(pos).get, getDoubleContent(0.0)),
+      Cell(fn(pos).get, getDoubleContent(1.0)),
+      Cell(fp(pos).get, getDoubleContent(0.0)),
+      Cell(precision(pos).get, getDoubleContent(1.0)),
+      Cell(recall(pos).get, getDoubleContent(0.5)),
+      Cell(tn(pos).get, getDoubleContent(0.0)),
+      Cell(tp(pos).get, getDoubleContent(1.0))
+    )
+  }
+
+  it should "prepare, reduce and present expanded" in {
+    val obj = ConfusionMatrixAggregator(
+      extractor,
+      fnMap
+    )(
+      accuracy,
+      f1score,
+      fdr,
+      fn,
+      fp,
+      precision,
+      recall,
+      tn,
+      tp
+    ).andThenRelocate(_.position.prepend("baz").toOption)
+
+    val t1 = obj.prepare(cell1)
+    t1 shouldBe Option(ConfusionMatrix(tp = 1))
+
+    val t2 = obj.prepare(cell2)
+    t2 shouldBe Option(ConfusionMatrix(fn = 1))
+
+    val r = obj.reduce(t1.get, t2.get)
+    r shouldBe ConfusionMatrix(tp = 1, fn = 1)
+
+    val c = obj.present(pos, r).result.toList
+    c.sortBy(_.position) shouldBe List(
+      Cell(accuracyP(posPrepend).get, getDoubleContent(0.5)),
+      Cell(f1scoreP(posPrepend).get, getDoubleContent(0.6666666666666666)),
+      Cell(fdrP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(fnP(posPrepend).get, getDoubleContent(1.0)),
+      Cell(fpP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(precisionP(posPrepend).get, getDoubleContent(1.0)),
+      Cell(recallP(posPrepend).get, getDoubleContent(0.5)),
+      Cell(tnP(posPrepend).get, getDoubleContent(0.0)),
+      Cell(tpP(posPrepend).get, getDoubleContent(1.0))
+    )
   }
 }
 
