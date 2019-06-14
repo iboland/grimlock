@@ -603,8 +603,13 @@ object OrdinalSchema {
   private val PatternSet = s"${OrdinalType.name}\\(set=\\{(.*)\\}\\)".r
 }
 
-case class PairSchema[X, Y]() extends Schema[(X, Y)] {
-  val classification = PairType
+/**
+ * Schema for pair variables.
+ *
+ * TODO: finish this
+ */
+case class PairSchema[X, Y](xSchema: Schema[X], ySchema: Schema[Y]) extends Schema[(X, Y)] {
+  val classification = PairType(xSchema.classification, ySchema.classification)
 
   def validate(value: Value[(X, Y)]): Boolean = true
 }
@@ -619,13 +624,22 @@ object PairSchema {
     *
     * @return A `Some[PairSchema[X, Y]]` if successful, `None` otherwise.
     */
-  def fromShortString[X, Y](str: String, codec: PairCodec[X, Y]): Option[PairSchema[X, Y]] = str match {
-    case PatternName() => Option(PairSchema[X, Y]())
+  def fromShortString[
+    X,
+    Y
+  ](
+    str: String,
+    xSchema: Schema[X],
+    ySchema: Schema[Y],
+    codec: PairCodec[X, Y]
+  ): Option[PairSchema[X, Y]] = str match {
+    case PatternPair(x, y) if x == xSchema.toShortString(codec.xCodec) && y == ySchema.toShortString(codec.yCodec) =>
+      Option(PairSchema[X, Y](xSchema, ySchema))
     case _ => None
   }
 
   /** Pattern for matching short string nominal schema. */
-  private val PatternName = PairType.name.r
+  private val PatternPair = s"${PairType.name}\\((.+),(.+)\\)".r
 }
 
 /**
