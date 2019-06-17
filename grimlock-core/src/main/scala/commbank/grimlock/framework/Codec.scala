@@ -585,7 +585,15 @@ case object LongCodec extends Codec[Long] {
   }
 }
 
-/** Codec for dealing with a pair of values. Each value must have a corresponding `Codec`. */
+/**
+ * Codec for dealing with a pair of values.
+ *
+ * @param xCodec Codec for the left data type in the pair.
+ * @param yCodec Schema for the right data type in the pair.
+ * @param open Length-one character for specifying the opening value for the pair when writing and reading.
+ * @param sep Length-one character for specifying the separator for the pair when writing and reading.
+ * @param close Length-one character for specifying the closing value for the pair when writing and reading.
+ * */
 case class PairCodec[
   X : TypeTag,
   Y : TypeTag
