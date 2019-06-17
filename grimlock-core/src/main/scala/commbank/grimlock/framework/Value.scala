@@ -42,7 +42,7 @@ trait Value[T] {
   protected val ttag: TypeTag[T]
 
   /** Return value as `X` (if an appropriate converter exists), or `None` if the conversion is not supported. */
-  def as[X : ClassTag: TypeTag]: Option[X] = {
+  def as[X : ClassTag : TypeTag]: Option[X] = {
     val ct = implicitly[ClassTag[X]]
 
     def cast(v: Any): Option[X] = v match {

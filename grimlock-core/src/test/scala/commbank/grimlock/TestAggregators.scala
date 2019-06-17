@@ -24,10 +24,10 @@ import commbank.grimlock.framework.position._
 
 import commbank.grimlock.library.aggregate._
 
+import scala.reflect.runtime.universe.TypeTag
+
 import shapeless.{ ::, HList, HNil, Nat }
 import shapeless.nat.{ _0, _1 }
-
-import scala.reflect.runtime.universe.TypeTag
 
 trait TestAggregators extends TestGrimlock {
   type P = Value[String] :: Value[String] :: HNil

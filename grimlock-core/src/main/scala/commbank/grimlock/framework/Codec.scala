@@ -21,8 +21,8 @@ import java.text.{ ParsePosition, SimpleDateFormat }
 import java.util.Date
 
 import scala.math.BigDecimal
-import scala.util.{ Success, Try }
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.{ Success, Try }
 import scala.util.matching.Regex
 
 import shapeless.{ :+:, CNil, Coproduct }

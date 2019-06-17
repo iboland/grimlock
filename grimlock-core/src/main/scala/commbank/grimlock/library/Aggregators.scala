@@ -920,11 +920,11 @@ case class GeneratePair[
   def reduce(lt: T, rt: T): T = lt ++ rt
 
   def present(pos: Position[S], t: T): O[Cell[S]] = t match {
-    case List((str1, Left(x)), (str2, Right(y))) => createSingle(pos, x, y)
-    case List((str1, Right(x)), (str2, Left(y))) => createSingle(pos, y, x)
-    case List((str, Left(v))) =>
+    case List((id1, Left(x)), (id2, Right(y))) => createSingle(pos, x, y)
+    case List((id1, Right(x)), (id2, Left(y))) => createSingle(pos, y, x)
+    case List((id, Left(v))) =>
       right.default.map(createSingle(pos, v, _)).getOrElse(Single())
-    case List((str, Right(v))) =>
+    case List((id, Right(v))) =>
       left.default.map(createSingle(pos, _, v)).getOrElse(Single())
     case _ => Single()
   }
@@ -965,7 +965,6 @@ case class PairSpec[I, X](id: I, codec: Codec[X], schema: Schema[X], default: Op
  * @param recall             The name for the recall.
  * @param tn                 The name for the number of true negatives.
  * @param tp                 The name for the number of true positives.
-
  *
  * @note The values for each cell is expected to be a `PairValue[Boolean, Double]` where the elements are the
  *       outcome and the score respectively.
@@ -1064,12 +1063,16 @@ case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
 
   /** Calculate the accuracy. */
   def accuracy: Double = (tp + tn) / total.toDouble
+
   /** Calculate the F1-score. */
   def f1Score: Double = 2 * tp / (2 * tp + fp + fn).toDouble
+
   /** Calculate the false discovery rate. */
   def fdr: Double = fp / (fp + tp).toDouble
+
   /** Calculate the precision. */
   def precision: Double = tp / (tp + fp).toDouble
+
   /** Calculate the recall. */
   def recall: Double = tp.toDouble / (tp + fn).toDouble
 
