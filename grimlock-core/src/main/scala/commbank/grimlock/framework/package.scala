@@ -72,9 +72,9 @@ package environment {
     ](
       t: (X, Y)
     )(implicit
-      xToValue: Value.Box[X],
-      yToValue: Value.Box[Y]
-    ) = PairValue(t, PairCodec(t._1.codec, t._2.codec))
+      ev1: Value.Box[X],
+      ev2: Value.Box[Y]
+    ): Value[(X, Y)] = PairValue(t, PairCodec(ev1(t._1).codec, ev2(t._2).codec))
   }
 }
 
