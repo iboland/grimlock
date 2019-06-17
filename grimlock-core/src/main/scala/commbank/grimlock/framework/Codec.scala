@@ -590,10 +590,10 @@ case object LongCodec extends Codec[Long] {
  *
  * @param xCodec Codec for the left data type in the pair.
  * @param yCodec Schema for the right data type in the pair.
- * @param open Length-one character for specifying the opening value for the pair when writing and reading.
- * @param sep Length-one character for specifying the separator for the pair when writing and reading.
- * @param close Length-one character for specifying the closing value for the pair when writing and reading.
- * */
+ * @param open   Character for specifying the opening value for the pair when writing and reading.
+ * @param sep    Character for specifying the separator for the pair when writing and reading.
+ * @param close  Character for specifying the closing value for the pair when writing and reading.
+ */
 case class PairCodec[
   X : TypeTag,
   Y : TypeTag
@@ -637,14 +637,14 @@ object PairCodec {
   val Pattern: Regex = raw"pair(.)(.+)\1(.+)\1(.)\1(.)".r
 
   /**
-    * Parse a PairCodec[X, Y] from a string.
-    *
-    * @param str String from which to parse the codec.
-    * @param xCodec Left Codec[X] to attempt to parse PairCodec.
-    * @param yCodec Left Codec[Y] to attempt to parse PairCodec.
-    *
-    * @return A `Some[PairCodec[X, Y]]` in case of success, `None` otherwise.
-    */
+   * Parse a PairCodec[X, Y] from a string.
+   *
+   * @param str    String from which to parse the codec.
+   * @param xCodec Left Codec[X] to attempt to parse PairCodec.
+   * @param yCodec Left Codec[Y] to attempt to parse PairCodec.
+   *
+   * @return A `Some[PairCodec[X, Y]]` in case of success, `None` otherwise.
+   */
   def fromShortString[
     X : TypeTag,
     Y : TypeTag
