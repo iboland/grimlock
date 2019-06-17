@@ -874,7 +874,7 @@ case class CountMapHistogram[
 }
 
 /**
- * Aggregator to create PairValues
+ * Aggregator to create PairValues.
  *
  * Aggregate a list of cells down into pairs of values that match according to all coordinates in a slice `S`
  * bar one at dimension `D`. The result is a list of cells with all values filled to have `PairValue`s.
@@ -895,24 +895,25 @@ case class GeneratePair[
   P <: HList,
   S <: HList,
   D <: Nat,
+  I : ClassTag : TypeTag,
   X : ClassTag : TypeTag,
   Y : ClassTag : TypeTag
 ](
-  left: PairSpec[X],
-  right: PairSpec[Y],
+  left: PairSpec[I, X],
+  right: PairSpec[I, Y],
   dim: D
 )(implicit
   ev: Position.IndexConstraints.Aux[P, D, Value[String]]
 ) extends Aggregator[P, S, S] {
-  type T = List[(String, Either[X, Y])]
+  type T = List[(I, Either[X, Y])]
   type O[A] = Single[A]
 
   val tTag = classTag[T]
   val oTag = classTag[O[_]]
 
-  def prepare(cell: Cell[P]): Option[T] = cell.position(dim).value match {
-    case str: String if str == left.id => cell.content.value.as[X].map(d => List((str, Left(d))))
-    case str: String if str == right.id => cell.content.value.as[Y].map(d => List((str, Right(d))))
+  def prepare(cell: Cell[P]): Option[T] = cell.position(dim).as[I] match {
+    case Some(v) if v == left.id => cell.content.value.as[X].map(d => List((v, Left(d))))
+    case Some(v) if v == right.id => cell.content.value.as[Y].map(d => List((v, Right(d))))
     case _ => None
   }
 
@@ -941,15 +942,15 @@ case class GeneratePair[
 /**
  * Configuration class for one side of the `GeneratePair` aggregator.
  *
- * @param id      String indicating the key that identifies this Spec.
+ * @param id      A value indicating the key that identifies this Spec.
  * @param codec   A codec of type X for which the data should attempt to be cast.
  * @param schema  A schema of type X for which the data should be validated against.
  * @param default Optionally, a default value for the data.
  */
-case class PairSpec[X](id: String, codec: Codec[X], schema: Schema[X], default: Option[X] = None)
+case class PairSpec[I, X](id: I, codec: Codec[X], schema: Schema[X], default: Option[X] = None)
 
 /**
- * Compute confusion matrix
+ * Compute confusion matrix.
  *
  * @param accuracy           The name for the accuracy.
  * @param extractor          Extractor that specifies the Slice of Position[P] for which the functionMap should be
@@ -990,9 +991,6 @@ case class ConfusionMatrixAggregator[
 )(implicit
   ev: Value.Box[Double]
 ) extends Aggregator[P, S, Q] {
-  type outcome = Boolean
-  type score = Double
-
   type T = ConfusionMatrix
   type O[A] = Multiple[A]
 
@@ -1000,11 +998,10 @@ case class ConfusionMatrixAggregator[
   val oTag = classTag[O[_]]
 
   def prepare(cell: Cell[P]): Option[T] = {
-    val linkFunction = extractor.extract(cell, functionMap)
-
-    linkFunction
+    extractor
+      .extract(cell, functionMap)
       .flatMap { fn =>
-        cell.content.value.as[(outcome, score)] match {
+        cell.content.value.as[(ConfusionMatrixAggregator.O, ConfusionMatrixAggregator.S)] match {
           case Some((o, s)) if fn(s) && o => Some(ConfusionMatrix(tp = 1))
           case Some((o, s)) if fn(s) && !o => Some(ConfusionMatrix(fp = 1))
           case Some((o, s)) if !fn(s) && o => Some(ConfusionMatrix(fn = 1))
@@ -1030,6 +1027,14 @@ case class ConfusionMatrixAggregator[
         tp(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
       ).flatten
     )
+}
+
+/** Companion object to `ConfusionMatrixAggregator`. */
+object ConfusionMatrixAggregator {
+  /** Type of the event outcome. */
+  type O = Boolean
+  /** Type of the event probability. */
+  type S = Double
 }
 
 /**

@@ -33,9 +33,9 @@ trait Value[T] {
   val value: T
 
   /**
-    * Set of ClassTags for which conversion to an `X` within the `as` method is only
-    * allowed if the full type of `X` matches the full type of `T`.
-    */
+   * Set of ClassTags for which conversion to an `X` within the `as` method is only
+   * allowed if the full type of `X` matches the full type of `T`.
+   */
   protected val requireEqual: Set[ClassTag[_]] = Set(classTag[List[_]], classTag[Tuple2[_, _]])
 
   /** TypeTag of `T`. */
@@ -347,6 +347,7 @@ object LongValue {
   def unapply(value: Value[_]): Option[Long] = ClassTag.Long.unapply(value.value)
 }
 
+/** Value for when the data is of type `Pair`. */
 case class PairValue[
   X : TypeTag,
   Y : TypeTag

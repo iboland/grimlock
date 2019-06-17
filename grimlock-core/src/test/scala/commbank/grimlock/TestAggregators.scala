@@ -3764,7 +3764,7 @@ class TestGeneratePair extends TestAggregators {
   val doubleDefault: Double = -999.0
 
   "A GeneratePair" should "prepare, reduce and present" in {
-    val obj = GeneratePair[P, S, _0, Double, String](
+    val obj = GeneratePair[P, S, _0, String, Double, String](
       PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
       PairSpec("right", StringCodec, NominalSchema[String]()),
       _0
@@ -3784,7 +3784,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "prepare, reduce and present expanded" in {
-    val obj = GeneratePair[P, S, _0, String, Double](
+    val obj = GeneratePair[P, S, _0, String, String, Double](
       PairSpec("left", StringCodec, NominalSchema[String]()),
       PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0
@@ -3798,7 +3798,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present with default values for left" in {
-    val obj = GeneratePair[P, S, _0, String, String](
+    val obj = GeneratePair[P, S, _0, String, String, String](
       PairSpec("left", StringCodec, NominalSchema[String](), Option(stringDefault)),
       PairSpec("right", StringCodec, NominalSchema[String]()),
       _0
@@ -3809,7 +3809,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present with default values for right" in {
-    val obj = GeneratePair[P, S, _0, Double, Double](
+    val obj = GeneratePair[P, S, _0, String, Double, Double](
       PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
       PairSpec("right", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
       _0
@@ -3820,7 +3820,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present empty with no default values" in {
-    val obj = GeneratePair[P, S, _0, Double, Double](
+    val obj = GeneratePair[P, S, _0, String, Double, Double](
       PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
       PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0
@@ -3831,7 +3831,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present empty with both default values and no input" in {
-    val obj = GeneratePair[P, S, _0, Double, Double](
+    val obj = GeneratePair[P, S, _0, String, Double, Double](
       PairSpec("left", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
       PairSpec("right", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
       _0
@@ -3842,7 +3842,7 @@ class TestGeneratePair extends TestAggregators {
   }
 
   it should "present empty with more than 2 values" in {
-    val obj = GeneratePair[P, S, _0, String, Double](
+    val obj = GeneratePair[P, S, _0, String, String, Double](
       PairSpec("left", StringCodec, NominalSchema[String]()),
       PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0

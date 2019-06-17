@@ -627,13 +627,13 @@ case class PairSchema[
 
   def toShortString(codec: PairCodec[X, Y]): String = classification.toShortString + round(paramString(codec))
 
-  protected def paramString(codec: PairCodec[X, Y]): String =
-    s"left=${xSchema.toShortString(codec.xCodec)},right=${ySchema.toShortString(codec.yCodec)}"
-
-  override protected def paramString(codec: Codec[(X, Y)]): String =
-    "no supported left or right codecs"
+  override protected def paramString(codec: Codec[(X, Y)]): String = codec match {
+    case pair: PairCodec[X, Y] => s"left=${xSchema.toShortString(pair.xCodec)},right=${ySchema.toShortString(pair.yCodec)}"
+    case _ => "NOT SUPPORTED CODEC"
+  }
 }
 
+/** Companion object to `PairSchema`. */
 object PairSchema {
   /** Pattern for matching short string pair schema. */
   val Pattern = s"${PairType.name}.*".r
