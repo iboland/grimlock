@@ -953,8 +953,10 @@ case class PairSpec[I, X](id: I, codec: Codec[X], schema: Schema[X], default: Op
  * Compute confusion matrix.
  *
  * @param accuracy           The name for the accuracy.
- * @param extractor          Extractor that specifies the Slice of Position[P] for which the functionMap should be
+ * @param extractor          Extractor that specifies the Slice of `Position[P]` for which the functionMap should be
  *                           matched upon.
+ * @param functionMap        A map from a slice of the `Position[P]` to a link function, which will be used to align
+ *                           scores and outcomes.
  * @param f1Score            The name for the F1-score.
  * @param fdr                The name for the false discovery rate.
  * @param fn                 The name for the number of false negatives.
@@ -963,10 +965,9 @@ case class PairSpec[I, X](id: I, codec: Codec[X], schema: Schema[X], default: Op
  * @param recall             The name for the recall.
  * @param tn                 The name for the number of true negatives.
  * @param tp                 The name for the number of true positives.
- * @param functionMap        A map from a slice of the Position[P] to a link function, which will be used to align
- *                           scores and outcomes.
+
  *
- * @note The values for each cell is expected to be a PairValue[Boolean, Double] where the elements are the
+ * @note The values for each cell is expected to be a `PairValue[Boolean, Double]` where the elements are the
  *       outcome and the score respectively.
  */
 case class ConfusionMatrixAggregator[
@@ -1046,6 +1047,13 @@ object ConfusionMatrixAggregator {
  * @param tn number of true negatives.
  */
 case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
+  /**
+   * Add two confusion matrices together.
+   *
+   * @param that The `ConfusionMatrix` to add.
+   *
+   * @return A `ConfusionMatrix` with the metrics (`tp`, `fp`, `fn` and `tn`) added together from this and `that`.
+   */
   def +(that: ConfusionMatrix): ConfusionMatrix =
     ConfusionMatrix(
       tp + that.tp,
@@ -1054,10 +1062,15 @@ case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
       tn + that.tn
     )
 
+  /** Calculate the accuracy. */
   def accuracy: Double = (tp + tn) / total.toDouble
+  /** Calculate the F1-score. */
   def f1Score: Double = 2 * tp / (2 * tp + fp + fn).toDouble
+  /** Calculate the false discovery rate. */
   def fdr: Double = fp / (fp + tp).toDouble
+  /** Calculate the precision. */
   def precision: Double = tp / (tp + fp).toDouble
+  /** Calculate the recall. */
   def recall: Double = tp.toDouble / (tp + fn).toDouble
 
   private def total: Int = tp + fp + fn + tn

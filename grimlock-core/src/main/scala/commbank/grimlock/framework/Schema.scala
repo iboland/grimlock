@@ -625,8 +625,6 @@ case class PairSchema[
     xSchema.validate(value.value._1) && ySchema.validate(value.value._2)
   }
 
-  def toShortString(codec: PairCodec[X, Y]): String = classification.toShortString + round(paramString(codec))
-
   override protected def paramString(codec: Codec[(X, Y)]): String = codec match {
     case pair: PairCodec[X, Y] => s"left=${xSchema.toShortString(pair.xCodec)},right=${ySchema.toShortString(pair.yCodec)}"
     case _ => "NOT SUPPORTED CODEC"
