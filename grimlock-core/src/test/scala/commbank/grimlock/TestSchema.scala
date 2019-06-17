@@ -17,7 +17,6 @@ package commbank.grimlock.test
 import commbank.grimlock.framework.encoding._
 import commbank.grimlock.framework.metadata._
 
-import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -484,32 +483,47 @@ class TestPairSchema extends TestGrimlock {
   val date2001 = dfmt.parse("01/01/2001")
   val one = BigDecimal(1.0)
 
+  import commbank.grimlock.framework.environment.implicits.{ doubleToValue, longToValue, stringToValue }
+
   "A PairSchema" should "return its string representation" in {
-    PairSchema[String, Double]().toShortString(PairCodec(StringCodec, DoubleCodec)) shouldBe "pair"
-    PairSchema[Date, Timestamp]().toShortString(PairCodec(DateCodec(), TimestampCodec)) shouldBe "pair"
+    PairSchema(NominalSchema[String](Set("a","b","c",",","}")), ContinuousSchema[Double](-3.1415, 1.4142))
+      .toShortString(PairCodec(StringCodec, DoubleCodec)) shouldBe
+        "pair(left=nominal(set={},a,\\,,b,c}),right=continuous(min=-3.1415,max=1.4142))"
   }
 
   it should "validate a correct value" in {
-    PairSchema[String, Double]().validate(PairValue(("abc", 1.0), PairCodec(StringCodec, DoubleCodec))) shouldBe true
-    PairSchema[Timestamp, BigDecimal]()
-      .validate(
-        PairValue(
-          (new Timestamp(date2001.getTime), one),
-          PairCodec(TimestampCodec, DecimalCodec(5, 4))
-        )
-      ) shouldBe true
+    PairSchema(NominalSchema[String](), ContinuousSchema[Double]())
+      .validate(PairValue(("abc", 1.0), PairCodec(StringCodec, DoubleCodec))) shouldBe true
   }
 
   it should "not validate an incorrect value" in {
-    // TODO: it allows all values of type (X, Y). So this test is redundant
+    val obj = PairSchema(NominalSchema[String](Set("a", "b")), ContinuousSchema[Long](-1, 1, 5, 4))
+
+    obj.validate(PairValue(("d", 1), PairCodec(StringCodec, LongCodec))) shouldBe false
+    obj.validate(PairValue(("a", -4), PairCodec(StringCodec, LongCodec))) shouldBe false
   }
 
   it should "parse correctly" in {
-    PairSchema.fromShortString("pair", PairCodec(IntCodec, StringCodec)) shouldBe Option(PairSchema[Int, String])
+    PairSchema.fromShortString(
+      "pair(left=continuous(scale=4),right=ordinal(set={a,b}))",
+      PairCodec(DoubleCodec, StringCodec),
+      ContinuousSchema[Double](None, None, None, Option(4)),
+      OrdinalSchema(Set[String]("a", "b"))
+    ) shouldBe Option(
+      PairSchema[Double, String](
+        ContinuousSchema[Double](None, None, None, Option(4)),
+        OrdinalSchema(Set[String]("a", "b"))
+      )
+    )
   }
 
   it should "not parse an incorrect string" in {
-    PairSchema.fromShortString("Xair", PairCodec(StringCodec, IntCodec)) shouldBe None
+    PairSchema.fromShortString(
+      "Xair",
+      PairCodec(DoubleCodec, StringCodec),
+      ContinuousSchema[Double](),
+      OrdinalSchema[String]()
+    ) shouldBe None
   }
 }
 

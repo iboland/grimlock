@@ -348,11 +348,11 @@ object LongValue {
 }
 
 case class PairValue[
-  X: TypeTag,
-  Y: TypeTag
+  X : TypeTag,
+  Y : TypeTag
 ](
-   value: (X, Y),
-   codec: PairCodec[X, Y]
+  value: (X, Y),
+  codec: Codec[(X, Y)]
  ) extends Value[(X, Y)] {
   protected val ttag: TypeTag[(X, Y)] = typeTag[(X, Y)]
 

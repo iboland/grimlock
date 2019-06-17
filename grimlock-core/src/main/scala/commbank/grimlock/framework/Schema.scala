@@ -46,7 +46,7 @@ trait Schema[T] {
 
   protected def paramString(codec: Codec[T]): String = ""
 
-  private def round(str: String): String = if (str.isEmpty) str else "(" + str + ")"
+  protected def round(str: String): String = if (str.isEmpty) str else "(" + str + ")"
 }
 
 /** Companion object to the `Schema` trait. */
@@ -606,40 +606,63 @@ object OrdinalSchema {
 /**
  * Schema for pair variables.
  *
- * TODO: finish this
+ * @param xSchema Schema for the left variable in the pair.
+ * @param ySchema Schema for the right variable in the pair.
  */
-case class PairSchema[X, Y](xSchema: Schema[X], ySchema: Schema[Y]) extends Schema[(X, Y)] {
-  val classification = PairType(xSchema.classification, ySchema.classification)
+case class PairSchema[
+  X,
+  Y
+](
+  xSchema: Schema[X],
+  ySchema: Schema[Y]
+)(implicit
+  ev1: Value.Box[X],
+  ev2: Value.Box[Y]
+) extends Schema[(X, Y)] {
+  val classification = PairType
 
-  def validate(value: Value[(X, Y)]): Boolean = true
+  def validate(value: Value[(X, Y)]): Boolean = {
+    xSchema.validate(value.value._1) && ySchema.validate(value.value._2)
+  }
+
+  def toShortString(codec: PairCodec[X, Y]): String = classification.toShortString + round(paramString(codec))
+
+  protected def paramString(codec: PairCodec[X, Y]): String =
+    s"left=${xSchema.toShortString(codec.xCodec)},right=${ySchema.toShortString(codec.yCodec)}"
+
+  override protected def paramString(codec: Codec[(X, Y)]): String =
+    "no supported left or right codecs"
 }
 
 object PairSchema {
+  /** Pattern for matching short string pair schema. */
   val Pattern = s"${PairType.name}.*".r
   /**
-    * Parse a pair schema from string.
-    *
-    * @param str   The string to parse.
-    * @param codec The codec to parse with.
-    *
-    * @return A `Some[PairSchema[X, Y]]` if successful, `None` otherwise.
-    */
+   * Parse a pair schema from string.
+   *
+   * @param str   The string to parse.
+   * @param codec The codec to parse with.
+   * @param xSchema Schema for the left variable in the pair.
+   * @param ySchema Schema for the right variable in the pair.
+   *
+   * @return A `Some[PairSchema[X, Y]]` if successful, `None` otherwise.
+   */
   def fromShortString[
     X,
     Y
   ](
     str: String,
+    codec: PairCodec[X, Y],
     xSchema: Schema[X],
-    ySchema: Schema[Y],
-    codec: PairCodec[X, Y]
+    ySchema: Schema[Y]
   ): Option[PairSchema[X, Y]] = str match {
     case PatternPair(x, y) if x == xSchema.toShortString(codec.xCodec) && y == ySchema.toShortString(codec.yCodec) =>
-      Option(PairSchema[X, Y](xSchema, ySchema))
+      Option(PairSchema[X, Y](xSchema, ySchema)(codec.xCodec.box, codec.yCodec.box))
     case _ => None
   }
 
-  /** Pattern for matching short string nominal schema. */
-  private val PatternPair = s"${PairType.name}\\((.+),(.+)\\)".r
+  /** Pattern for matching short string pair schema with left and right. */
+  private val PatternPair = s"${PairType.name}\\(left=(.+),right=(.+)\\)".r
 }
 
 /**

@@ -41,10 +41,17 @@ trait TestAggregators extends TestGrimlock {
     Y : TypeTag
   ](
     left: X,
-    right: Y,
-    codec: PairCodec[X, Y],
-    schema: PairSchema[X ,Y] = PairSchema[X, Y]()
-   ): Content = Content(schema, PairValue((left, right), codec))
+    right: Y
+  )(implicit
+    ev1: Codec[X],
+    ev2: Codec[Y],
+    ev3: Schema[X],
+    ev4: Schema[Y]
+   ): Content = {
+    val codec = PairCodec(ev1, ev2)
+    val schema = PairSchema(ev3, ev4)(ev1.box, ev2.box)
+    Content(schema, PairValue((left, right), codec))
+  }
 
   /** Append a string to the position. */
   def appendString[
@@ -3738,6 +3745,10 @@ class TestCountMapHistogram extends TestAggregators {
 
 class TestGeneratePair extends TestAggregators {
   import commbank.grimlock.framework.environment.implicits.stringToValue
+  implicit val dCodec = DoubleCodec
+  implicit val sCodec = StringCodec
+  implicit val cSchema = ContinuousSchema[Double]
+  implicit val sSchema = NominalSchema[String]()
 
   val cellD1 = Cell(Position("left", "foo"), getDoubleContent(1))
   val cellD2 = Cell(Position("right", "foo"), getDoubleContent(2))
@@ -3754,8 +3765,8 @@ class TestGeneratePair extends TestAggregators {
 
   "A GeneratePair" should "prepare, reduce and present" in {
     val obj = GeneratePair[P, S, _0, Double, String](
-      PairSpec("left", DoubleCodec),
-      PairSpec("right", StringCodec),
+      PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
+      PairSpec("right", StringCodec, NominalSchema[String]()),
       _0
     )
 
@@ -3769,13 +3780,13 @@ class TestGeneratePair extends TestAggregators {
     r shouldBe (tD1 ++ tS2)
 
     val c = obj.present(Position("foo"), r).result
-    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, "baz", PairCodec(DoubleCodec, StringCodec))))
+    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, "baz")))
   }
 
   it should "prepare, reduce and present expanded" in {
     val obj = GeneratePair[P, S, _0, String, Double](
-      PairSpec("left", StringCodec),
-      PairSpec("right", DoubleCodec),
+      PairSpec("left", StringCodec, NominalSchema[String]()),
+      PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0
     ).andThenRelocate(_.position.append("pair").toOption)
 
@@ -3783,35 +3794,35 @@ class TestGeneratePair extends TestAggregators {
     val t2 = obj.prepare(cellD2)
     val r = obj.reduce(t1.get, t2.get)
     val c = obj.present(Position("foo"), r).result
-    c shouldBe Option(Cell(Position("foo", "pair"), getPairContent("foo", 2.0, PairCodec(StringCodec, DoubleCodec))))
+    c shouldBe Option(Cell(Position("foo", "pair"), getPairContent("foo", 2.0)))
   }
 
   it should "present with default values for left" in {
     val obj = GeneratePair[P, S, _0, String, String](
-      PairSpec("left", StringCodec, Option(stringDefault)),
-      PairSpec("right", StringCodec),
+      PairSpec("left", StringCodec, NominalSchema[String](), Option(stringDefault)),
+      PairSpec("right", StringCodec, NominalSchema[String]()),
       _0
     )
     val t = obj.prepare(cellS2)
     val c = obj.present(Position("foo"), t.get).result
-    c shouldBe Option(Cell(Position("foo"), getPairContent(stringDefault, "baz", PairCodec(StringCodec, StringCodec))))
+    c shouldBe Option(Cell(Position("foo"), getPairContent(stringDefault, "baz")))
   }
 
   it should "present with default values for right" in {
     val obj = GeneratePair[P, S, _0, Double, Double](
-      PairSpec("left", DoubleCodec),
-      PairSpec("right", DoubleCodec, Option(doubleDefault)),
+      PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
+      PairSpec("right", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
       _0
     )
     val t = obj.prepare(cellD1)
     val c = obj.present(Position("foo"), t.get).result
-    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, doubleDefault, PairCodec(DoubleCodec, DoubleCodec))))
+    c shouldBe Option(Cell(Position("foo"), getPairContent(1.0, doubleDefault)))
   }
 
   it should "present empty with no default values" in {
     val obj = GeneratePair[P, S, _0, Double, Double](
-      PairSpec("left", DoubleCodec),
-      PairSpec("right", DoubleCodec),
+      PairSpec("left", DoubleCodec, ContinuousSchema[Double]()),
+      PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0
     )
     val t = List.empty[(String, Either[Double, Double])]
@@ -3821,8 +3832,8 @@ class TestGeneratePair extends TestAggregators {
 
   it should "present empty with both default values and no input" in {
     val obj = GeneratePair[P, S, _0, Double, Double](
-      PairSpec("left", DoubleCodec, Option(doubleDefault)),
-      PairSpec("right", DoubleCodec, Option(doubleDefault)),
+      PairSpec("left", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
+      PairSpec("right", DoubleCodec, ContinuousSchema[Double](), Option(doubleDefault)),
       _0
     )
     val t = List.empty[(String, Either[Double, Double])]
@@ -3832,8 +3843,8 @@ class TestGeneratePair extends TestAggregators {
 
   it should "present empty with more than 2 values" in {
     val obj = GeneratePair[P, S, _0, String, Double](
-      PairSpec("left", StringCodec),
-      PairSpec("right", DoubleCodec),
+      PairSpec("left", StringCodec, NominalSchema[String]()),
+      PairSpec("right", DoubleCodec, ContinuousSchema[Double]()),
       _0
     ).andThenRelocate(_.position.append("pair").toOption)
 
@@ -3846,9 +3857,13 @@ class TestGeneratePair extends TestAggregators {
 
 class TestConfusionMatrixAggregator extends TestAggregators {
   import commbank.grimlock.framework.environment.implicits.stringToValue
+  implicit val dCodec = DoubleCodec
+  implicit val bCodec = BooleanCodec
+  implicit val dSchema = NominalSchema[Boolean]()
+  implicit val cSchema = ContinuousSchema[Double]
 
   def binaryCell[Z <: HList](pos: Position[Z], score: Double, outcome: Boolean) =
-    Cell(pos, getPairContent(outcome, score, PairCodec(BooleanCodec, DoubleCodec)))
+    Cell(pos, getPairContent(outcome, score))
 
   val cell1 = binaryCell(Position("foo", "bar"), 0.5, true)
   val cell2 = binaryCell(Position("foo", "baz"), 0.5, true)

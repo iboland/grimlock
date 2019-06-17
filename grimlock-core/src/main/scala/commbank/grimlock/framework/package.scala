@@ -69,7 +69,8 @@ package environment {
     implicit def pairToValue[
       X: TypeTag,
       Y: TypeTag
-    ](t: (X, Y)
+    ](
+      t: (X, Y)
     )(implicit
       xToValue: Value.Box[X],
       yToValue: Value.Box[Y]

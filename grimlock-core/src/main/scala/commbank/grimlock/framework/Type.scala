@@ -196,12 +196,10 @@ case object DateType extends Type {
 }
 
 /** Type for pair types. */
-case class PairType[X <: Type, Y <: Type](xType: X, yType: Y) extends Type {
-  def toShortString: String = s"${PairType.name}(${xType.toShortString},${yType.toShortString})"
-}
-
-/** Companion object to `PairType`. */
-object PairType {
+case object PairType extends Type {
   /** Short name for this type. */
   val name = "pair"
+
+  def toShortString: String = PairType.name
 }
+

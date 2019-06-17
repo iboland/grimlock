@@ -25,7 +25,8 @@ import commbank.grimlock.framework.metadata.{
   ContinuousSchema,
   DiscreteSchema,
   NumericType,
-  PairSchema
+  PairSchema,
+  Schema
 }
 import commbank.grimlock.framework.position.Position
 import commbank.grimlock.framework.statistics.Statistics
@@ -873,23 +874,23 @@ case class CountMapHistogram[
 }
 
 /**
-  * Aggregator to create PairValues
-  *
-  * Aggregate a list of cells down into pairs of values that match according to all coordinates in a slice `S`
-  * bar one at dimension `D`. The result is a list of cells with all values filled to have `PairValue`s.
-  *
-  * At `D` the accepted positional values are specified as the ids for `left` and `right`.
-  * Contents found at any other coordinates of `D` are discarded. If more than two values are found for any of the
-  * `left` or `right` coordinates, all values at those coordinates are discarded. Optionally, impute a default value
-  * if only one value found for the specified `D` coordinates.
-  *
-  * This operation is conceptually similar to an inner join, with the
-  * difference being that if duplicates are found all rows for that entry are discarded.
-  *
-  * @param left         A `PairSpec` detailing the settings desired for the left data.
-  * @param right        A `PairSpec` detailing the settings desired for the right data.
-  * @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
-  */
+ * Aggregator to create PairValues
+ *
+ * Aggregate a list of cells down into pairs of values that match according to all coordinates in a slice `S`
+ * bar one at dimension `D`. The result is a list of cells with all values filled to have `PairValue`s.
+ *
+ * At `D` the accepted positional values are specified as the ids for `left` and `right`.
+ * Contents found at any other coordinates of `D` are discarded. If more than two values are found for any of the
+ * `left` or `right` coordinates, all values at those coordinates are discarded. Optionally, impute a default value
+ * if only one value found for the specified `D` coordinates.
+ *
+ * This operation is conceptually similar to an inner join, with the
+ * difference being that if duplicates are found all rows for that entry are discarded.
+ *
+ * @param left         A `PairSpec` detailing the settings desired for the left data.
+ * @param right        A `PairSpec` detailing the settings desired for the right data.
+ * @param dim          The dimension as a shapeless `Nat` for which the key string is to be found.
+ */
 case class GeneratePair[
   P <: HList,
   S <: HList,
@@ -897,11 +898,11 @@ case class GeneratePair[
   X : ClassTag : TypeTag,
   Y : ClassTag : TypeTag
 ](
-   left: PairSpec[X],
-   right: PairSpec[Y],
-   dim: D
+  left: PairSpec[X],
+  right: PairSpec[Y],
+  dim: D
 )(implicit
-   ev1: Position.IndexConstraints.Aux[P, D, Value[String]]
+  ev: Position.IndexConstraints.Aux[P, D, Value[String]]
 ) extends Aggregator[P, S, S] {
   type T = List[(String, Either[X, Y])]
   type O[A] = Single[A]
@@ -928,41 +929,45 @@ case class GeneratePair[
   }
 
   private def createSingle(position: Position[S], l: X, r: Y): O[Cell[S]] = {
-    val content = Content(PairSchema[X, Y](), PairValue((l, r), PairCodec(left.codec, right.codec)))
+    val content = Content(
+      PairSchema[X, Y](left.schema, right.schema)(left.codec.box, right.codec.box),
+      PairValue((l, r), PairCodec(left.codec, right.codec))
+    )
 
     Single(Cell(position, content))
   }
 }
 
 /**
-  * Configuration class for one side of the `GeneratePair` aggregator.
-  *
-  * @param id      String indicating the key that identifies this Spec.
-  * @param codec   A codec of type X for which the data should attempt to be cast.
-  * @param default Optionally, a default value for the data.
-  */
-case class PairSpec[X](id: String, codec: Codec[X], default: Option[X] = None)
+ * Configuration class for one side of the `GeneratePair` aggregator.
+ *
+ * @param id      String indicating the key that identifies this Spec.
+ * @param codec   A codec of type X for which the data should attempt to be cast.
+ * @param schema  A schema of type X for which the data should be validated against.
+ * @param default Optionally, a default value for the data.
+ */
+case class PairSpec[X](id: String, codec: Codec[X], schema: Schema[X], default: Option[X] = None)
 
 /**
-  * Compute confusion matrix
-  *
-  * @param accuracy           The name for the accuracy.
-  * @param extractor          Extractor that specifies the Slice of Position[P] for which the functionMap should be
-  *                           matched upon.
-  * @param f1Score            The name for the F1-score.
-  * @param fdr                The name for the false discovery rate.
-  * @param fn                 The name for the number of false negatives.
-  * @param fp                 The name for the number of false positives.
-  * @param precision          The name for the precision.
-  * @param recall             The name for the recall.
-  * @param tn                 The name for the number of true negatives.
-  * @param tp                 The name for the number of true positives.
-  * @param functionMap        A map from a slice of the Position[P] to a link function, which will be used to align
-  *                           scores and outcomes.
-  *
-  * @note The values for each cell is expected to be a PairValue[Boolean, Double] where the elements are the
-  *       outcome and the score respectively.
-  */
+ * Compute confusion matrix
+ *
+ * @param accuracy           The name for the accuracy.
+ * @param extractor          Extractor that specifies the Slice of Position[P] for which the functionMap should be
+ *                           matched upon.
+ * @param f1Score            The name for the F1-score.
+ * @param fdr                The name for the false discovery rate.
+ * @param fn                 The name for the number of false negatives.
+ * @param fp                 The name for the number of false positives.
+ * @param precision          The name for the precision.
+ * @param recall             The name for the recall.
+ * @param tn                 The name for the number of true negatives.
+ * @param tp                 The name for the number of true positives.
+ * @param functionMap        A map from a slice of the Position[P] to a link function, which will be used to align
+ *                           scores and outcomes.
+ *
+ * @note The values for each cell is expected to be a PairValue[Boolean, Double] where the elements are the
+ *       outcome and the score respectively.
+ */
 case class ConfusionMatrixAggregator[
   P <: HList,
   S <: HList,
@@ -983,7 +988,7 @@ case class ConfusionMatrixAggregator[
   tn: Locate.FromPosition[S, Q],
   tp: Locate.FromPosition[S, Q]
 )(implicit
-  ev1: Value.Box[Double]
+  ev: Value.Box[Double]
 ) extends Aggregator[P, S, Q] {
   type outcome = Boolean
   type score = Double
@@ -1011,7 +1016,7 @@ case class ConfusionMatrixAggregator[
 
   def reduce(lt: T, rt: T): T = lt + rt
 
-  def present(pos: Position[S], t: T): O[Cell[Q]] = {
+  def present(pos: Position[S], t: T): O[Cell[Q]] =
     Multiple(
       List(
         accuracy(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.accuracy)) },
@@ -1025,19 +1030,16 @@ case class ConfusionMatrixAggregator[
         tp(pos).map { p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
       ).flatten
     )
-  }
-
-
 }
 
 /**
-  * Case class for a confusion matrix.
-  *
-  * @param tp number of true positives.
-  * @param fp number of false positives.
-  * @param fn number of false negatives.
-  * @param tn number of true negatives.
-  */
+ * Case class for a confusion matrix.
+ *
+ * @param tp number of true positives.
+ * @param fp number of false positives.
+ * @param fn number of false negatives.
+ * @param tn number of true negatives.
+ */
 case class ConfusionMatrix(tp: Int = 0, fp: Int = 0, fn: Int = 0, tn: Int = 0) {
   def +(that: ConfusionMatrix): ConfusionMatrix =
     ConfusionMatrix(
