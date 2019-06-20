@@ -459,7 +459,7 @@ trait Matrix[
     slice: Slice[P, S, R],
     tuner: T
   )(
-    ascendig: Boolean,
+    ascending: Boolean,
     value: C#E[W],
     windows: WindowWithValue[P, S, R, Q] { type V >: W }*
   )(implicit
