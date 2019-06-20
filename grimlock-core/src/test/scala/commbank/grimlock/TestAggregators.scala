@@ -3793,8 +3793,7 @@ class TestConfusionMatrixAggregator extends TestAggregators {
 
   "A ConfusionMatrix" should "prepare, reduce and present" in {
     val obj = ConfusionMatrixAggregator(
-      map
-    )(
+      map,
       accuracy,
       f1score,
       fdr,
@@ -3831,8 +3830,7 @@ class TestConfusionMatrixAggregator extends TestAggregators {
 
   it should "prepare, reduce and present expanded" in {
     val obj = ConfusionMatrixAggregator(
-      map
-    )(
+      map,
       accuracy,
       f1score,
       fdr,

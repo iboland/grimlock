@@ -868,33 +868,32 @@ case class CountMapHistogram[
 /**
  * Compute confusion matrix.
  *
- * @param accuracy  The name for the accuracy.
- * @param f1        The name for the F1-score.
- * @param fdr       The name for the false discovery rate.
- * @param fn        The name for the number of false negatives.
- * @param fp        The name for the number of false positives.
- * @param map       Returns (actual binary outcome, predicted binary outcome) from a `Cell`.
- * @param precision The name for the precision.
- * @param recall    The name for the recall.
- * @param tn        The name for the number of true negatives.
- * @param tp        The name for the number of true positives.
+ * @param outcome            Returns (actual binary outcome, predicted binary outcome) from a `Cell`.
+ * @param accuracy           The name for the accuracy.
+ * @param f1Score            The name for the F1-score.
+ * @param falseDiscoveryRate The name for the false discovery rate.
+ * @param falseNegatives     The name for the number of false negatives.
+ * @param falsePositives     The name for the number of false positives.
+ * @param precision          The name for the precision.
+ * @param recall             The name for the recall.
+ * @param trueNegatives      The name for the number of true negatives.
+ * @param truePositives      The name for the number of true positives.
  */
 case class ConfusionMatrixAggregator[
   P <: HList,
   S <: HList,
   Q <: HList
 ](
-  map: Cell[P] => Option[(Boolean, Boolean)]
-)(
+  outcome: Cell[P] => Option[(Boolean, Boolean)],
   accuracy: Locate.FromPosition[S, Q],
-  f1: Locate.FromPosition[S, Q],
-  fdr: Locate.FromPosition[S, Q],
-  fn: Locate.FromPosition[S, Q],
-  fp: Locate.FromPosition[S, Q],
+  f1Score: Locate.FromPosition[S, Q],
+  falseDiscoveryRate: Locate.FromPosition[S, Q],
+  falseNegatives: Locate.FromPosition[S, Q],
+  falsePositives: Locate.FromPosition[S, Q],
   precision: Locate.FromPosition[S, Q],
   recall: Locate.FromPosition[S, Q],
-  tn: Locate.FromPosition[S, Q],
-  tp: Locate.FromPosition[S, Q]
+  trueNegatives: Locate.FromPosition[S, Q],
+  truePositives: Locate.FromPosition[S, Q]
 )(implicit
   ev: Value.Box[Double]
 ) extends Aggregator[P, S, Q] {
@@ -904,12 +903,11 @@ case class ConfusionMatrixAggregator[
   val tTag = classTag[T]
   val oTag = classTag[O[_]]
 
-  def prepare(cell: Cell[P]): Option[T] = map(cell) match {
-    case Some((true, true)) => Option(ConfusionMatrix(tp = 1))
-    case Some((false, true)) => Option(ConfusionMatrix(fp = 1))
-    case Some((true, false)) => Option(ConfusionMatrix(fn = 1))
-    case Some((false, false)) => Option(ConfusionMatrix(tn = 1))
-    case _ => None
+  def prepare(cell: Cell[P]): Option[T] = outcome(cell).map {
+    case (true, true) => ConfusionMatrix(tp = 1)
+    case (false, true) => ConfusionMatrix(fp = 1)
+    case (true, false) => ConfusionMatrix(fn = 1)
+    case (false, false) => ConfusionMatrix(tn = 1)
   }
 
   def reduce(lt: T, rt: T): T = lt + rt
@@ -917,14 +915,14 @@ case class ConfusionMatrixAggregator[
   def present(pos: Position[S], t: T): O[Cell[Q]] = Multiple(
     List(
       accuracy(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.accuracy)) },
-      f1(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.f1Score)) },
-      fdr(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fdr)) },
-      fn(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fn.toDouble)) },
-      fp(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fp.toDouble)) },
+      f1Score(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.f1Score)) },
+      falseDiscoveryRate(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fdr)) },
+      falseNegatives(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fn.toDouble)) },
+      falsePositives(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.fp.toDouble)) },
       precision(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.precision)) },
       recall(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.recall)) },
-      tn(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tn.toDouble)) },
-      tp(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
+      trueNegatives(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tn.toDouble)) },
+      truePositives(pos).map { case p => Cell(p, Content(ContinuousSchema[Double](), t.tp.toDouble)) }
     ).flatten
   )
 }
